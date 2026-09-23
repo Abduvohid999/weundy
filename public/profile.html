@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mening Profilim - Weundy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto space-y-6">
+        
+        <!-- Yuqori qism / Header -->
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-blue-600 text-white font-bold text-2xl rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30" id="userInitial">U</div>
+                <div>
+                    <h1 id="userName" class="text-xl font-bold">Yuklanmoqda...</h1>
+                    <p id="userEmail" class="text-xs text-slate-400">-</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <a href="/" class="bg-slate-700 hover:bg-slate-600 text-sm px-4 py-2 rounded-xl transition">Asosiy sahifa</a>
+                <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-sm px-4 py-2 rounded-xl transition border border-red-500/30">Chiqish</button>
+            </div>
+        </div>
+
+        <!-- Ovqatlanish tarixi sarlavhasi -->
+        <div class="flex justify-between items-center">
+            <h2 class="text-lg font-bold">Ovqatlanish tarixi va tahlillar</h2>
+            <span id="logCount" class="text-xs bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-slate-400">0 ta yozuv</span>
+        </div>
+
+        <!-- Tarix ro'yxati -->
+        <div id="logsContainer" class="space-y-3">
+            <!-- Dinamik to'ldiriladi -->
+            <div class="text-center py-10 text-slate-500 text-sm">Tarix yuklanmoqda...</div>
+        </div>
+
+    </div>
+
+    <script>
+        const userId = localStorage.getItem('userId');
+
+        if (!userId) {
+            // Agar foydalanuvchi kirmagan bo'lsa, login sahifasiga yo'naltiramiz
+            window.location.href = '/auth.html';
+        }
+
+        async function loadProfile() {
+            try {
+                const res = await fetch(`/api/user/profile/${userId}`);
+                const data = await res.json();
+
+                if (res.ok) {
+                    document.getElementById('userName').innerText = data.user.username;
+                    document.getElementById('userEmail').innerText = data.user.email;
+                    document.getElementById('userInitial').innerText = data.user.username.charAt(0).toUpperCase();
+
+                    const logsContainer = document.getElementById('logsContainer');
+                    document.getElementById('logCount').innerText = `${data.logs.length} ta yozuv`;
+
+                    if (data.logs.length === 0) {
+                        logsContainer.innerHTML = `<div class="text-center py-12 bg-slate-800/50 border border-slate-800 rounded-2xl text-slate-400 text-sm">Hozircha ovqatlanish tarixi mavjud emas. Rasm tahlil qilib qo'shing!</div>`;
+                        return;
+                    }
+
+                    logsContainer.innerHTML = data.logs.map(log => `
+                        <div class="bg-slate-800 border border-slate-700 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                            <div>
+                                <h3 class="font-bold text-sm text-white">${log.foodName}</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">${new Date(log.date).toLocaleString('uz-UZ')}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-lg font-medium">🔥 ${log.calories} kcal</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg font-medium">🥩 ${log.protein}g protein</span>
+                                <span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-lg font-medium">🍞 ${log.carbs}g uglevod</span>
+                                <span class="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1 rounded-lg font-medium">🥑 ${log.fat}g yog'</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    alert(data.error || "Xatolik yuz berdi");
+                    logout();
+                }
+            } catch (err) {
+                console.error("Profilni yuklashda xatolik:", err);
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/auth.html';
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

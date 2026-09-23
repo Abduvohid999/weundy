@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weundy - Kirish / Ro'yxatdan o'tish</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
+        
+        <!-- Sarlavha -->
+        <div class="text-center space-y-2">
+            <div class="w-12 h-12 bg-blue-600 text-white font-bold text-xl rounded-xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/30">W</div>
+            <h1 id="formTitle" class="text-2xl font-bold">Xush kelibsiz!</h1>
+            <p id="formSubtitle" class="text-xs text-slate-400">Davom etish uchun hisobingizga kiring</p>
+        </div>
+
+        <!-- Forma -->
+        <form id="authForm" class="space-y-4">
+            <div id="usernameField" class="hidden">
+                <label class="block text-xs text-slate-400 mb-1">Ismingiz</label>
+                <input type="text" id="username" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Email manzil</label>
+                <input type="email" id="email" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Parol</label>
+                <input type="password" id="password" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-xl transition text-sm shadow-lg shadow-blue-600/20">Kirish</button>
+        </form>
+
+        <p id="errorMsg" class="text-red-400 text-xs text-center hidden"></p>
+
+        <!-- Rejimni almashtirish tugmasi -->
+        <div class="text-center text-xs text-slate-400 pt-2 border-t border-slate-700">
+            <span id="switchText">Hisobingiz yo'qmi?</span> 
+            <button onclick="toggleMode()" id="switchBtn" class="text-blue-400 font-medium hover:underline ml-1">Ro'yxatdan o'tish</button>
+        </div>
+    </div>
+
+    <script>
+        let isLogin = true;
+
+        function toggleMode() {
+            isLogin = !isLogin;
+            const title = document.getElementById('formTitle');
+            const subtitle = document.getElementById('formSubtitle');
+            const usernameField = document.getElementById('usernameField');
+            const submitBtn = document.getElementById('submitBtn');
+            const switchText = document.getElementById('switchText');
+            const switchBtn = document.getElementById('switchBtn');
+            document.getElementById('errorMsg').classList.add('hidden');
+
+            if (isLogin) {
+                title.innerText = "Xush kelibsiz!";
+                subtitle.innerText = "Davom etish uchun hisobingizga kiring";
+                usernameField.classList.add('hidden');
+                submitBtn.innerText = "Kirish";
+                switchText.innerText = "Hisobingiz yo'qmi?";
+                switchBtn.innerText = "Ro'yxatdan o'tish";
+            } else {
+                title.innerText = "Ro'yxatdan o'tish";
+                subtitle.innerText = "Yangi shaxsiy profilingizni yarating";
+                usernameField.classList.remove('hidden');
+                submitBtn.innerText = "Ro'yxatdan o'tish";
+                switchText.innerText = "Hisobingiz bormi?";
+                switchBtn.innerText = "Kirish";
+            }
+        }
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const username = document.getElementById('username').value;
+            const errorMsg = document.getElementById('errorMsg');
+
+            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+            const bodyData = isLogin ? { email, password } : { username, email, password };
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    // Foydalanuvchi ma'lumotlarini brauzerda saqlaymiz
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('username', data.user.username);
+                    localStorage.setItem('email', data.user.email);
+                    
+                    // Profil sahifasiga yo'naltiramiz
+                    window.location.href = '/profile.html';
+                } else {
+                    errorMsg.innerText = data.error || "Xatolik yuz berdi";
+                    errorMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorMsg.innerText = "Tarmoqda xatolik yuz berdi";
+                errorMsg.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

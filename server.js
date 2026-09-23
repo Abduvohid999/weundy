@@ -705,3 +705,135 @@ app.listen(
 
     }
 );
+const bcrypt = require('bcryptjs');
+
+// ===============================
+// 1. UPDATED SCHEMAS & MODELS
+// ===============================
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const FoodLogSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    foodName: String,
+    calories: Number,
+    protein: Number,
+    fat: Number,
+    carbs: Number,
+    date: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', UserSchema);
+const FoodLog = mongoose.model('FoodLog', FoodLogSchema);
+
+// ===============================
+// 2. AUTHENTICATION API'S
+// ===============================
+
+// Ro'yxatdan o'tish
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ error: "Bu email allaqachon band qilingan!" });
+        }
+
+        // Parolni shifrlash (hash)
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = new User({
+            username,
+            email,
+            password: hashedPassword
+        });
+
+        await newUser.save();
+        res.json({ 
+            success: true, 
+            message: "Muvaffaqiyatli ro'yxatdan o'tdingiz!", 
+            user: { id: newUser._id, username: newUser.username, email: newUser.email } 
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Server xatoligi: " + err.message });
+    }
+});
+
+// Tizimga kirish (Login)
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ error: "Email yoki parol noto'g'ri!" });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Email yoki parol noto'g'ri!" });
+        }
+
+        res.json({ 
+            success: true, 
+            message: "Xush kelibsiz!", 
+            user: { id: user._id, username: user.username, email: user.email } 
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Server xatoligi: " + err.message });
+    }
+});
+
+// ===============================
+// 3. USER PROFILE & HISTORY API
+// ===============================
+app.get('/api/user/profile/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ error: "Foydalanuvchi topilmadi!" });
+        }
+
+        // Faqat shu foydalanuvchiga tegishli ovqatlanish tarixi
+        const logs = await FoodLog.find({ userId }).sort({ date: -1 });
+
+        res.json({ user, logs });
+    } catch (err) {
+        res.status(500).json({ error: "Ma'lumotlarni olishda xatolik" });
+    }
+});
+
+// ===============================
+// 4. UPDATE ANALYZE & SAVE FOR USER
+// ===============================
+// AI tahlil qilib natijani bazaga saqlashda userId ni qabul qiladigan qilamiz
+app.post('/api/save-food', async (req, res) => {
+    try {
+        const { userId, foodName, calories, protein, fat, carbs } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({ error: "Foydalanuvchi aniqlanmadi. Iltimos qaytadan kiring!" });
+        }
+
+        const newLog = new FoodLog({
+            userId,
+            foodName,
+            calories: parseInt(calories) || 0,
+            protein: parseFloat(protein) || 0,
+            fat: parseFloat(fat) || 0,
+            carbs: parseFloat(carbs) || 0
+        });
+        
+        await newLog.save();
+        res.json({ success: true, message: "Ovqat tarixi profilingizga saqlandi!" });
+    } catch (err) {
+        res.status(500).json({ error: "Saqlashda xatolik: " + err.message });
+    }
+});
