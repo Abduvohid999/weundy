@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,22 +32,36 @@ mongoose.connect(process.env.MONGO_URI)
         console.log('MongoDB-ga muvaffaqiyatli ulandi!');
     })
     .catch((err) => {
-        console.error(
-            'MongoDB-ga ulanishda xatolik:',
-            err
-        );
+        console.error('MongoDB-ga ulanishda xatolik:', err);
     });
 
 
 // ==================================================
-// DATABASE SCHEMAS
+// USER SCHEMA
 // ==================================================
 
 const UserSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true
+    },
 
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+
+    password: {
+        type: String,
+        required: true
+    },
+
+    // Android device ID
     deviceId: {
         type: String,
-        unique: true
+        unique: true,
+        sparse: true
     },
 
     createdAt: {
@@ -58,29 +73,49 @@ const UserSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-
 });
 
 
+// ==================================================
+// FOOD LOG SCHEMA
+// ==================================================
+
 const FoodLogSchema = new mongoose.Schema({
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false
+    },
 
-    deviceId: String,
+    deviceId: {
+        type: String,
+        required: false
+    },
 
-    foodName: String,
+    foodName: {
+        type: String
+    },
 
-    calories: Number,
+    calories: {
+        type: Number
+    },
 
-    protein: Number,
+    protein: {
+        type: Number
+    },
 
-    fat: Number,
+    fat: {
+        type: Number
+    },
 
-    carbs: Number,
+    carbs: {
+        type: Number
+    },
 
     date: {
         type: Date,
         default: Date.now
     }
-
 });
 
 
@@ -88,19 +123,13 @@ const FoodLogSchema = new mongoose.Schema({
 // DATABASE MODELS
 // ==================================================
 
-const User = mongoose.model(
-    'User',
-    UserSchema
-);
+const User = mongoose.model('User', UserSchema);
 
-const FoodLog = mongoose.model(
-    'FoodLog',
-    FoodLogSchema
-);
+const FoodLog = mongoose.model('FoodLog', FoodLogSchema);
 
 
 // ==================================================
-// ANALYZE MEAL - GROQ VISION
+// GROQ MEAL ANALYSIS
 // ==================================================
 
 app.post('/api/analyze-meal', async (req, res) => {
@@ -109,7 +138,8 @@ app.post('/api/analyze-meal', async (req, res) => {
 
         const {
             imageBase64,
-            deviceId
+            deviceId,
+            userId
         } = req.body;
 
 
@@ -130,14 +160,12 @@ app.post('/api/analyze-meal', async (req, res) => {
         // GROQ API KEY
         // ------------------------------------------
 
-        const apiKey =
-            process.env.GROQ_API_KEY;
-
+        const apiKey = process.env.GROQ_API_KEY;
 
         if (!apiKey) {
 
             throw new Error(
-                'GROQ_API_KEY muhit o\'zgaruvchisi topilmadi!'
+                "GROQ_API_KEY muhit o'zgaruvchisi topilmadi!"
             );
 
         }
@@ -159,16 +187,9 @@ app.post('/api/analyze-meal', async (req, res) => {
 
                 body: JSON.stringify({
 
-                    // --------------------------------
-                    // CURRENT GROQ VISION MODEL
-                    // --------------------------------
-
                     model: 'qwen/qwen3.8-27b',
 
-
-                    // --------------------------------
-                    // MESSAGES
-                    // --------------------------------
+                    reasoning_effort: 'none',
 
                     messages: [
 
@@ -176,10 +197,6 @@ app.post('/api/analyze-meal', async (req, res) => {
                             role: 'user',
 
                             content: [
-
-                                // ==========================
-                                // TEXT
-                                // ==========================
 
                                 {
                                     type: 'text',
@@ -213,38 +230,24 @@ Faqat JSON qaytar.
 `
                                 },
 
-
-                                // ==========================
-                                // IMAGE
-                                // ==========================
-
                                 {
                                     type: 'image_url',
 
                                     image_url: {
-                                        url:
-                                            `data:image/jpeg;base64,${imageBase64}`
+                                        url: `data:image/jpeg;base64,${imageBase64}`
                                     }
+
                                 }
 
                             ]
+
                         }
 
                     ],
 
-
-                    // --------------------------------
-                    // JSON RESPONSE
-                    // --------------------------------
-
                     response_format: {
                         type: 'json_object'
                     },
-
-
-                    // --------------------------------
-                    // MAX TOKENS
-                    // --------------------------------
 
                     max_completion_tokens: 500
 
@@ -255,27 +258,18 @@ Faqat JSON qaytar.
 
 
         // ------------------------------------------
-        // READ RESPONSE
+        // READ GROQ RESPONSE
         // ------------------------------------------
 
-        const data =
-            await response.json();
+        const data = await response.json();
 
+        console.log('Groq status:', response.status);
 
-        console.log(
-            'Groq status:',
-            response.status
-        );
-
-
-        console.log(
-            'Groq response:',
-            data
-        );
+        console.log('Groq response:', data);
 
 
         // ------------------------------------------
-        // CHECK GROQ ERROR
+        // CHECK ERROR
         // ------------------------------------------
 
         if (!response.ok) {
@@ -298,7 +292,7 @@ Faqat JSON qaytar.
 
 
         // ------------------------------------------
-        // CHECK CHOICES
+        // CHECK AI RESPONSE
         // ------------------------------------------
 
         if (
@@ -315,19 +309,13 @@ Faqat JSON qaytar.
 
 
         // ------------------------------------------
-        // GET AI RESPONSE
+        // GET AI CONTENT
         // ------------------------------------------
 
         const rawContent =
-            data.choices[0]
-                .message
-                .content;
+            data.choices[0].message.content;
 
-
-        console.log(
-            'AI javobi:',
-            rawContent
-        );
+        console.log('AI javobi:', rawContent);
 
 
         // ------------------------------------------
@@ -339,93 +327,76 @@ Faqat JSON qaytar.
 
 
         // ==================================================
-        // SAVE TO MONGODB
+        // SAVE USER ACTIVITY
         // ==================================================
 
-        if (deviceId) {
+        if (userId) {
 
             try {
 
-                // --------------------------------------
-                // CREATE / UPDATE USER
-                // --------------------------------------
-
-                await User.findOneAndUpdate(
-
-                    {
-                        deviceId: deviceId
-                    },
-
+                await User.findByIdAndUpdate(
+                    userId,
                     {
                         lastActive: Date.now()
-                    },
-
-                    {
-                        upsert: true,
-                        new: true
                     }
-
                 );
 
+            } catch (userErr) {
 
-                // --------------------------------------
-                // CONVERT NUMBERS
-                // --------------------------------------
+                console.error(
+                    'User activity update error:',
+                    userErr
+                );
+
+            }
+
+        }
+
+
+        // ==================================================
+        // SAVE FOOD LOG
+        // ==================================================
+
+        if (userId || deviceId) {
+
+            try {
 
                 const cleanCal =
-                    parseInt(
-                        resultData.calories
-                    ) || 0;
-
+                    parseInt(resultData.calories) || 0;
 
                 const cleanProt =
-                    parseFloat(
-                        resultData.protein
-                    ) || 0;
-
+                    parseFloat(resultData.protein) || 0;
 
                 const cleanFat =
-                    parseFloat(
-                        resultData.fats
-                    ) || 0;
-
+                    parseFloat(resultData.fats) || 0;
 
                 const cleanCarbs =
-                    parseFloat(
-                        resultData.carbs
-                    ) || 0;
+                    parseFloat(resultData.carbs) || 0;
 
 
-                // --------------------------------------
-                // CREATE FOOD LOG
-                // --------------------------------------
+                const newLog = new FoodLog({
 
-                const newLog =
-                    new FoodLog({
+                    userId: userId || undefined,
 
-                        deviceId: deviceId,
+                    deviceId: deviceId || undefined,
 
-                        foodName:
-                            resultData.items,
+                    foodName:
+                        resultData.items,
 
-                        calories:
-                            cleanCal,
+                    calories:
+                        cleanCal,
 
-                        protein:
-                            cleanProt,
+                    protein:
+                        cleanProt,
 
-                        fat:
-                            cleanFat,
+                    fat:
+                        cleanFat,
 
-                        carbs:
-                            cleanCarbs
+                    carbs:
+                        cleanCarbs
 
-                    });
+                });
 
-
-                // --------------------------------------
-                // SAVE
-                // --------------------------------------
 
                 await newLog.save();
 
@@ -433,7 +404,6 @@ Faqat JSON qaytar.
                 console.log(
                     'Taom MongoDB-ga saqlandi!'
                 );
-
 
             } catch (dbErr) {
 
@@ -448,12 +418,10 @@ Faqat JSON qaytar.
 
 
         // ------------------------------------------
-        // SEND RESULT TO APP
+        // SEND RESULT
         // ------------------------------------------
 
-        res.json(
-            resultData
-        );
+        res.json(resultData);
 
 
     } catch (error) {
@@ -478,7 +446,358 @@ Faqat JSON qaytar.
 
 
 // ==================================================
-// MANUAL SAVE FOOD
+// REGISTER
+// ==================================================
+
+app.post('/api/auth/register', async (req, res) => {
+
+    try {
+
+        const {
+            username,
+            email,
+            password,
+            deviceId
+        } = req.body;
+
+
+        // ------------------------------------------
+        // VALIDATION
+        // ------------------------------------------
+
+        if (!username || !email || !password) {
+
+            return res.status(400).json({
+
+                error:
+                    'Username, email va password majburiy!'
+
+            });
+
+        }
+
+
+        // ------------------------------------------
+        // CHECK EMAIL
+        // ------------------------------------------
+
+        const existingUser =
+            await User.findOne({
+                email: email.toLowerCase()
+            });
+
+
+        if (existingUser) {
+
+            return res.status(400).json({
+
+                error:
+                    "Bu email allaqachon band qilingan!"
+
+            });
+
+        }
+
+
+        // ------------------------------------------
+        // HASH PASSWORD
+        // ------------------------------------------
+
+        const hashedPassword =
+            await bcrypt.hash(password, 10);
+
+
+        // ------------------------------------------
+        // CREATE USER
+        // ------------------------------------------
+
+        const newUser = new User({
+
+            username,
+
+            email:
+                email.toLowerCase(),
+
+            password:
+                hashedPassword,
+
+            deviceId:
+                deviceId || undefined
+
+        });
+
+
+        await newUser.save();
+
+
+        // ------------------------------------------
+        // RESPONSE
+        // ------------------------------------------
+
+        res.json({
+
+            success: true,
+
+            message:
+                "Muvaffaqiyatli ro'yxatdan o'tdingiz!",
+
+            user: {
+
+                id:
+                    newUser._id,
+
+                username:
+                    newUser.username,
+
+                email:
+                    newUser.email
+
+            }
+
+        });
+
+
+    } catch (err) {
+
+        console.error(
+            'Register error:',
+            err
+        );
+
+
+        res.status(500).json({
+
+            error:
+                'Server xatoligi: ' +
+                err.message
+
+        });
+
+    }
+
+});
+
+
+// ==================================================
+// LOGIN
+// ==================================================
+
+app.post('/api/auth/login', async (req, res) => {
+
+    try {
+
+        const {
+            email,
+            password
+        } = req.body;
+
+
+        // ------------------------------------------
+        // VALIDATION
+        // ------------------------------------------
+
+        if (!email || !password) {
+
+            return res.status(400).json({
+
+                error:
+                    'Email va parolni kiriting!'
+
+            });
+
+        }
+
+
+        // ------------------------------------------
+        // FIND USER
+        // ------------------------------------------
+
+        const user =
+            await User.findOne({
+                email: email.toLowerCase()
+            });
+
+
+        if (!user) {
+
+            return res.status(400).json({
+
+                error:
+                    "Email yoki parol noto'g'ri!"
+
+            });
+
+        }
+
+
+        // ------------------------------------------
+        // CHECK PASSWORD
+        // ------------------------------------------
+
+        const isMatch =
+            await bcrypt.compare(
+                password,
+                user.password
+            );
+
+
+        if (!isMatch) {
+
+            return res.status(400).json({
+
+                error:
+                    "Email yoki parol noto'g'ri!"
+
+            });
+
+        }
+
+
+        // ------------------------------------------
+        // UPDATE LAST ACTIVE
+        // ------------------------------------------
+
+        user.lastActive =
+            Date.now();
+
+        await user.save();
+
+
+        // ------------------------------------------
+        // RESPONSE
+        // ------------------------------------------
+
+        res.json({
+
+            success: true,
+
+            message:
+                'Xush kelibsiz!',
+
+            user: {
+
+                id:
+                    user._id,
+
+                username:
+                    user.username,
+
+                email:
+                    user.email
+
+            }
+
+        });
+
+
+    } catch (err) {
+
+        console.error(
+            'Login error:',
+            err
+        );
+
+
+        res.status(500).json({
+
+            error:
+                'Server xatoligi: ' +
+                err.message
+
+        });
+
+    }
+
+});
+
+
+// ==================================================
+// USER PROFILE + FOOD HISTORY
+// ==================================================
+
+app.get(
+    '/api/user/profile/:userId',
+    async (req, res) => {
+
+        try {
+
+            const {
+                userId
+            } = req.params;
+
+
+            // --------------------------------------
+            // FIND USER
+            // --------------------------------------
+
+            const user =
+                await User
+                    .findById(userId)
+                    .select('-password');
+
+
+            if (!user) {
+
+                return res.status(404).json({
+
+                    error:
+                        'Foydalanuvchi topilmadi!'
+
+                });
+
+            }
+
+
+            // --------------------------------------
+            // FIND FOOD HISTORY
+            // --------------------------------------
+
+            const logs =
+                await FoodLog
+                    .find({
+                        userId: userId
+                    })
+                    .sort({
+                        date: -1
+                    });
+
+
+            // --------------------------------------
+            // RESPONSE
+            // --------------------------------------
+
+            res.json({
+
+                user,
+
+                logs
+
+            });
+
+
+        } catch (err) {
+
+            console.error(
+                'Profile error:',
+                err
+            );
+
+
+            res.status(500).json({
+
+                error:
+                    "Ma'lumotlarni olishda xatolik"
+
+            });
+
+        }
+
+    }
+);
+
+
+// ==================================================
+// SAVE FOOD MANUALLY
 // ==================================================
 
 app.post('/api/save-food', async (req, res) => {
@@ -486,6 +805,7 @@ app.post('/api/save-food', async (req, res) => {
     try {
 
         const {
+            userId,
             deviceId,
             foodName,
             calories,
@@ -496,62 +816,83 @@ app.post('/api/save-food', async (req, res) => {
 
 
         // ------------------------------------------
+        // CHECK USER
+        // ------------------------------------------
+
+        if (!userId && !deviceId) {
+
+            return res.status(400).json({
+
+                error:
+                    "Foydalanuvchi aniqlanmadi. Iltimos qaytadan kiring!"
+
+            });
+
+        }
+
+
+        // ------------------------------------------
         // UPDATE USER
         // ------------------------------------------
 
-        await User.findOneAndUpdate(
+        if (userId) {
 
-            {
-                deviceId: deviceId
-            },
+            await User.findByIdAndUpdate(
 
-            {
-                lastActive: Date.now()
-            },
+                userId,
 
-            {
-                upsert: true,
-                new: true
-            }
+                {
+                    lastActive:
+                        Date.now()
+                }
 
-        );
+            );
 
-
-        // ------------------------------------------
-        // CREATE FOOD LOG
-        // ------------------------------------------
-
-        const newLog =
-            new FoodLog({
-
-                deviceId: deviceId,
-
-                foodName: foodName,
-
-                calories: calories,
-
-                protein: protein,
-
-                fat: fat,
-
-                carbs: carbs
-
-            });
+        }
 
 
         // ------------------------------------------
         // SAVE FOOD
         // ------------------------------------------
 
+        const newLog = new FoodLog({
+
+            userId:
+                userId || undefined,
+
+            deviceId:
+                deviceId || undefined,
+
+            foodName,
+
+            calories:
+                parseInt(calories) || 0,
+
+            protein:
+                parseFloat(protein) || 0,
+
+            fat:
+                parseFloat(fat) || 0,
+
+            carbs:
+                parseFloat(carbs) || 0
+
+        });
+
+
         await newLog.save();
 
+
+        // ------------------------------------------
+        // RESPONSE
+        // ------------------------------------------
 
         res.json({
 
             success: true,
 
             message:
-                'Ma\'lumot bazaga saqlandi!'
+                "Ovqat tarixi profilingizga saqlandi!"
 
         });
 
@@ -567,7 +908,8 @@ app.post('/api/save-food', async (req, res) => {
         res.status(500).json({
 
             error:
-                'Saqlashda xatolik yuz berdi'
+                'Saqlashda xatolik: ' +
+                err.message
 
         });
 
@@ -599,7 +941,7 @@ const adminAuth =
 
 
 // ==================================================
-// ADMIN STATS API
+// ADMIN STATS
 // ==================================================
 
 app.get(
@@ -609,25 +951,13 @@ app.get(
 
         try {
 
-            // --------------------------------------
-            // TOTAL USERS
-            // --------------------------------------
-
             const totalUsers =
                 await User.countDocuments();
 
 
-            // --------------------------------------
-            // TOTAL SCANS
-            // --------------------------------------
-
             const totalScans =
                 await FoodLog.countDocuments();
 
-
-            // --------------------------------------
-            // RECENT LOGS
-            // --------------------------------------
 
             const recentLogs =
                 await FoodLog
@@ -638,20 +968,13 @@ app.get(
                     .limit(10);
 
 
-            // --------------------------------------
-            // RESPONSE
-            // --------------------------------------
-
             res.json({
 
-                totalUsers:
-                    totalUsers,
+                totalUsers,
 
-                totalScans:
-                    totalScans,
+                totalScans,
 
-                recentLogs:
-                    recentLogs
+                recentLogs
 
             });
 
@@ -678,6 +1001,27 @@ app.get(
 
 
 // ==================================================
+// HEALTH CHECK
+// ==================================================
+
+app.get('/', (req, res) => {
+
+    res.json({
+
+        success: true,
+
+        message:
+            'WEUNDY MEAL AI SERVER ishlayapti!',
+
+        model:
+            'qwen/qwen3.8-27b'
+
+    });
+
+});
+
+
+// ==================================================
 // SERVER START
 // ==================================================
 
@@ -690,150 +1034,17 @@ app.listen(
         console.log('       WEUNDY MEAL AI SERVER');
         console.log('====================================');
         console.log('');
-
         console.log(
-            `Server: http://localhost:${PORT}`
+            `Server PORT: ${PORT}`
         );
-
-        console.log('');
-
         console.log(
             'Groq Vision: qwen/qwen3.8-27b'
         );
-
+        console.log('');
+        console.log(
+            'Server muvaffaqiyatli ishga tushdi!'
+        );
         console.log('');
 
     }
 );
-const bcrypt = require('bcryptjs');
-
-// ===============================
-// 1. UPDATED SCHEMAS & MODELS
-// ===============================
-const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const FoodLogSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    foodName: String,
-    calories: Number,
-    protein: Number,
-    fat: Number,
-    carbs: Number,
-    date: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', UserSchema);
-const FoodLog = mongoose.model('FoodLog', FoodLogSchema);
-
-// ===============================
-// 2. AUTHENTICATION API'S
-// ===============================
-
-// Ro'yxatdan o'tish
-app.post('/api/auth/register', async (req, res) => {
-    try {
-        const { username, email, password } = req.body;
-        
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ error: "Bu email allaqachon band qilingan!" });
-        }
-
-        // Parolni shifrlash (hash)
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser = new User({
-            username,
-            email,
-            password: hashedPassword
-        });
-
-        await newUser.save();
-        res.json({ 
-            success: true, 
-            message: "Muvaffaqiyatli ro'yxatdan o'tdingiz!", 
-            user: { id: newUser._id, username: newUser.username, email: newUser.email } 
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Server xatoligi: " + err.message });
-    }
-});
-
-// Tizimga kirish (Login)
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ error: "Email yoki parol noto'g'ri!" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: "Email yoki parol noto'g'ri!" });
-        }
-
-        res.json({ 
-            success: true, 
-            message: "Xush kelibsiz!", 
-            user: { id: user._id, username: user.username, email: user.email } 
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Server xatoligi: " + err.message });
-    }
-});
-
-// ===============================
-// 3. USER PROFILE & HISTORY API
-// ===============================
-app.get('/api/user/profile/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const user = await User.findById(userId).select('-password');
-        
-        if (!user) {
-            return res.status(404).json({ error: "Foydalanuvchi topilmadi!" });
-        }
-
-        // Faqat shu foydalanuvchiga tegishli ovqatlanish tarixi
-        const logs = await FoodLog.find({ userId }).sort({ date: -1 });
-
-        res.json({ user, logs });
-    } catch (err) {
-        res.status(500).json({ error: "Ma'lumotlarni olishda xatolik" });
-    }
-});
-
-// ===============================
-// 4. UPDATE ANALYZE & SAVE FOR USER
-// ===============================
-// AI tahlil qilib natijani bazaga saqlashda userId ni qabul qiladigan qilamiz
-app.post('/api/save-food', async (req, res) => {
-    try {
-        const { userId, foodName, calories, protein, fat, carbs } = req.body;
-        
-        if (!userId) {
-            return res.status(400).json({ error: "Foydalanuvchi aniqlanmadi. Iltimos qaytadan kiring!" });
-        }
-
-        const newLog = new FoodLog({
-            userId,
-            foodName,
-            calories: parseInt(calories) || 0,
-            protein: parseFloat(protein) || 0,
-            fat: parseFloat(fat) || 0,
-            carbs: parseFloat(carbs) || 0
-        });
-        
-        await newLog.save();
-        res.json({ success: true, message: "Ovqat tarixi profilingizga saqlandi!" });
-    } catch (err) {
-        res.status(500).json({ error: "Saqlashda xatolik: " + err.message });
-    }
-});
