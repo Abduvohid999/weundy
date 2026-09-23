@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>Weundy - Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">📊 Weundy Admin Dashboard</h1>
+        
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <p class="text-slate-400">Jami Foydalanuvchilar</p>
+                <h2 id="totalUsers" class="text-4xl font-bold text-emerald-400 mt-2">0</h2>
+            </div>
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <p class="text-slate-400">Jami Tahlil qilingan Taomlar</p>
+                <h2 id="totalScans" class="text-4xl font-bold text-sky-400 mt-2">0</h2>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h3 class="text-xl font-semibold mb-4">So'nggi tahlillar</h3>
+            <div id="logsList" class="space-y-2 text-sm text-slate-300"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            const res = await fetch('/api/admin/stats');
+            if(res.ok) {
+                const data = await res.json();
+                document.getElementById('totalUsers').innerText = data.totalUsers;
+                document.getElementById('totalScans').innerText = data.totalScans;
+                
+                const logsContainer = document.getElementById('logsList');
+                logsContainer.innerHTML = data.recentLogs.map(log => `
+                    <div class="flex justify-between border-b border-slate-700 py-2">
+                        <span>${log.foodName || 'Nomaʼlum taom'} (${log.calories} kcal)</span>
+                        <span class="text-slate-500">${new Date(log.date).toLocaleString()}</span>
+                    </div>
+                `).join('');
+            }
+        }
+        fetchStats();
+    </script>
+</body>
+</html>

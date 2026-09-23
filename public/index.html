@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="uz" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEUNDY - AI Calorie & Health Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between overflow-y-auto transition-colors duration-300">
+
+    <!-- AUTH SCREEN -->
+    <div id="authModal" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl mx-auto mb-2">W</div>
+                <h2 id="authTitle" class="text-lg font-bold text-white">Tizimga kirish</h2>
+                <p id="authSubtitle" class="text-xs text-slate-400 mt-1">Davom etish uchun hisobingizga kiring</p>
+            </div>
+            <div class="space-y-3">
+                <div id="nameFieldContainer" class="hidden">
+                    <label id="lblName" class="text-xs text-slate-400 block mb-1">Ismingiz</label>
+                    <input type="text" id="authName" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label id="lblEmail" class="text-xs text-slate-400 block mb-1">Email yoki Telefon</label>
+                    <input type="text" id="authEmail" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" placeholder="example@mail.com">
+                </div>
+                <div>
+                    <label id="lblPass" class="text-xs text-slate-400 block mb-1">Parol</label>
+                    <input type="password" id="authPassword" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" placeholder="••••••••">
+                </div>
+            </div>
+            <button onclick="handleAuthSubmit()" id="authSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition cursor-pointer shadow-lg shadow-blue-600/30">Kirish</button>
+            <div class="text-center pt-2">
+                <button onclick="toggleAuthMode()" id="authSwitchBtn" class="text-xs text-blue-400 hover:underline cursor-pointer">Hisobingiz yo'qmi? Ro'yxatdan o'tish</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="w-full max-w-md mx-auto flex justify-between items-center py-4 px-4 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+            <div class="bg-blue-600 p-2 rounded-xl text-white font-bold tracking-wider">W</div>
+            <span class="text-xl font-extrabold tracking-tight text-white">WEUNDY</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- Theme Toggle -->
+            <button onclick="toggleTheme()" class="text-slate-400 hover:text-amber-400 text-xs p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer" title="Rejimni o'zgartirish"><i id="themeIcon" class="fa-solid fa-moon"></i></button>
+            <!-- Language Select -->
+            <select id="langSelect" onchange="changeLanguage(this.value)" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer">
+                <option value="uz">O'zbekcha</option>
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+            </select>
+            <button onclick="logout()" class="text-slate-400 hover:text-rose-400 text-xs p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer" title="Chiqish"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="w-full max-w-md mx-auto flex flex-col space-y-4 my-auto p-4 flex-1">
+
+        <!-- TAB 1: ASOSIY (SCANNER & WATER & BJU) -->
+        <div id="tabHome" class="space-y-4">
+            <!-- Daily Goal Summary -->
+            <div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 shadow-md space-y-3">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p id="tDailyNorm" class="text-xs text-slate-400">Kunlik norma:</p>
+                        <p id="dailyNormDisplay" class="text-lg font-bold text-white">2000 kcal</p>
+                    </div>
+                    <div class="text-right">
+                        <p id="tConsumed" class="text-xs text-slate-400">iste'mol qilindi:</p>
+                        <p id="todayConsumedDisplay" class="text-lg font-bold text-emerald-400">0 kcal</p>
+                    </div>
+                </div>
+                <!-- BJU Progress Bars -->
+                <div class="pt-2 border-t border-slate-700/50 space-y-2">
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span id="labelProteinBar">Oqsil: <b id="pCount" class="text-blue-400">0g</b></span>
+                        <span id="labelCarbsBar">Uglevod: <b id="cCount" class="text-amber-400">0g</b></span>
+                        <span id="labelFatsBar">Yog': <b id="fCount" class="text-rose-400">0g</b></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Tracker Card -->
+            <div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 shadow-md flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-cyan-500/20 text-cyan-400 rounded-xl flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-droplet"></i>
+                    </div>
+                    <div>
+                        <p id="waterTitle" class="text-xs text-slate-400">Suv balansi (2.0 L)</p>
+                        <p id="waterCountDisplay" class="text-sm font-bold text-white">0 / 8 stakan</p>
+                    </div>
+                </div>
+                <div class="flex space-x-1">
+                    <button onclick="addWater()" class="bg-cyan-600 hover:bg-cyan-500 text-white w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer shadow-md shadow-cyan-600/30"><i class="fa-solid fa-plus text-xs"></i></button>
+                    <button onclick="resetWater()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 w-9 h-9 rounded-xl flex items-center justify-center transition cursor-pointer" title="Qayta tiklash"><i class="fa-solid fa-rotate-right text-xs"></i></button>
+                </div>
+            </div>
+
+            <!-- Upload Card -->
+            <div class="bg-slate-800 border-2 border-dashed border-slate-700 rounded-3xl p-6 text-center flex flex-col items-center justify-center relative overflow-hidden transition hover:border-blue-500 group cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="previewImage(event)">
+                <div id="uploadPlaceholder" class="flex flex-col items-center space-y-3">
+                    <div class="w-16 h-16 bg-blue-600/20 text-blue-400 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition">
+                        <i class="fa-solid fa-camera"></i>
+                    </div>
+                    <div>
+                        <p id="tUploadTitle" class="font-semibold text-white">Taom rasmini yuklang</p>
+                        <p id="tUploadSub" class="text-xs text-slate-400 mt-1">Kameradan yoki galereyadan tanlang</p>
+                    </div>
+                </div>
+                <img id="imagePreview" class="hidden w-full h-56 object-cover rounded-2xl shadow-lg" alt="Taom rasmi">
+            </div>
+
+            <!-- Analyze Button -->
+            <button onclick="analyzeMeal()" id="analyzeBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-2xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span id="tAnalyzeBtn">AI Tahlil qilish</span>
+            </button>
+
+            <!-- Loading Spinner -->
+            <div id="loading" class="hidden flex flex-col items-center justify-center space-y-3 py-4">
+                <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <p id="tLoadingText" class="text-sm text-slate-400">Sun'iy intellekt taomni tahlil qilmoqda...</p>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultCard" class="hidden bg-slate-800 border border-slate-700 rounded-3xl p-5 space-y-4 shadow-xl">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <span id="tResultTitle" class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Tahlil Natijasi</span>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label id="lblFoodName" class="text-[10px] text-slate-400 block mb-1">Taom nomi va tarkibi:</label>
+                        <input type="text" id="foodItemsInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label id="lblCal" class="text-[10px] text-slate-400 block mb-1">Kaloriya (kcal):</label>
+                            <input type="text" id="calorieInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-emerald-400 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label id="lblProt" class="text-[10px] text-slate-400 block mb-1">Oqsil (Protein):</label>
+                            <input type="text" id="proteinInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-blue-400 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label id="lblCarbs" class="text-[10px] text-slate-400 block mb-1">Uglevod (Carbs):</label>
+                            <input type="text" id="carbsInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-amber-400 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label id="lblFats" class="text-[10px] text-slate-400 block mb-1">Yog' (Fats):</label>
+                            <input type="text" id="fatsInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-rose-400 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-2 pt-2">
+                    <button onclick="saveMealToHistory()" id="btnSaveMeal" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-3 rounded-xl transition cursor-pointer shadow-lg shadow-emerald-600/20">Saqlash</button>
+                    <button onclick="saveAsFavorite()" id="btnSaveFav" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-3 rounded-xl transition cursor-pointer" title="Sevimnilarga qo'shish"><i class="fa-solid fa-star"></i></button>
+                    <button onclick="resetApp()" id="btnCancel" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold px-4 py-3 rounded-xl transition cursor-pointer">Bekor qilish</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: TARIX VA QIDIRUV -->
+        <div id="tabHistory" class="hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 id="tHistTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-clock-rotate-left mr-2 text-blue-500"></i> Ovqatlanish tarixi</h2>
+            </div>
+            <!-- Search & Filter Bar -->
+            <div>
+                <input type="text" id="historySearchInput" oninput="renderHistory()" placeholder="Taomni qidirish..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <div id="historyList" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB 3: SEVIMLILAR / RETSEPTLAR -->
+        <div id="tabFavorites" class="hidden space-y-4">
+            <h2 id="tFavTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-star mr-2 text-amber-400"></i> Sevimli taomlar</h2>
+            <div id="favoritesList" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB 4: PROFIL -->
+        <div id="tabProfile" class="hidden space-y-4">
+            <h2 id="tProfTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-user mr-2 text-blue-500"></i> Shaxsiy parametrlar va maqsad</h2>
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3 text-sm">
+                <div>
+                    <label id="lblGender" class="text-xs text-slate-400">Jinsingiz:</label>
+                    <select id="pGender" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 text-white">
+                        <option value="male" id="optMale">Erkak</option>
+                        <option value="female" id="optFemale">Ayol</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label id="lblAge" class="text-xs text-slate-400">Yosh:</label>
+                        <input type="number" id="pAge" value="20" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 mt-1 text-white text-center">
+                    </div>
+                    <div>
+                        <label id="lblHeight" class="text-xs text-slate-400">Bo'y (sm):</label>
+                        <input type="number" id="pHeight" value="175" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 mt-1 text-white text-center">
+                    </div>
+                    <div>
+                        <label id="lblWeight" class="text-xs text-slate-400">Vazn (kg):</label>
+                        <input type="number" id="pWeight" value="70" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 mt-1 text-white text-center">
+                    </div>
+                </div>
+                <div>
+                    <label id="lblGoal" class="text-xs text-slate-400">Maqsadingiz:</label>
+                    <select id="pGoal" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 text-white">
+                        <option value="lose" id="optLose">Vazn tashlash (Ozish)</option>
+                        <option value="maintain" id="optMaintain">Vaznni bir xilda saqlash</option>
+                        <option value="gain" id="optGain">Vazn yig'ish (Massa)</option>
+                    </select>
+                </div>
+                <button onclick="saveProfile()" id="btnSaveProfile" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition cursor-pointer mt-2">Hisoblash va saqlash</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Navigation -->
+    <footer class="w-full max-w-md mx-auto flex justify-around py-3 border-t border-slate-800 text-slate-400 text-xs bg-slate-900">
+        <button onclick="switchTab('home')" id="navHome" class="flex flex-col items-center text-blue-500 cursor-pointer"><i class="fa-solid fa-house text-base"></i><span class="mt-1" id="navHomeText">Asosiy</span></button>
+        <button onclick="switchTab('history')" id="navHistory" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-clock-rotate-left text-base"></i><span class="mt-1" id="navHistText">Tarix</span></button>
+        <button onclick="switchTab('favorites')" id="navFavorites" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-star text-base"></i><span class="mt-1" id="navFavText">Sevimli</span></button>
+        <button onclick="switchTab('profile')" id="navProfile" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-user text-base"></i><span class="mt-1" id="navProfText">Profil</span></button>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        let base64Image = "";
+        let isSignUp = false;
+        let currentLang = localStorage.getItem('weundy_lang') || 'uz';
+        let currentTheme = localStorage.getItem('weundy_theme') || 'dark';
+
+        const dict = {
+            uz: {
+                authTitleLogin: "Tizimga kirish", authTitleReg: "Ro'yxatdan o'tish",
+                authSubLogin: "Davom etish uchun hisobingizga kiring", authSubReg: "Yangi hisob yaratish uchun ma'lumotlarni kiriting",
+                lblName: "Ismingiz", lblEmail: "Email yoki Telefon", lblPass: "Parol",
+                btnLogin: "Kirish", btnReg: "Ro'yxatdan o'tish",
+                switchLogin: "Hisobingiz yo'qmi? Ro'yxatdan o'tish", switchReg: "Hisobingiz bormi? Tizimga kirish",
+                tDailyNorm: "Kunlik norma:", tConsumed: "iste'mol qilindi:",
+                tUploadTitle: "Taom rasmini yuklang", tUploadSub: "Kameradan yoki galereyadan tanlang",
+                tAnalyzeBtn: "AI Tahlil qilish", tLoadingText: "Sun'iy intellekt taomni tahlil qilmoqda...",
+                tResultTitle: "Tahlil Natijasi",
+                lblFoodName: "Taom nomi va tarkibi:", lblCal: "Kaloriya (kcal):", lblProt: "Oqsil (Protein):", lblCarbs: "Uglevod (Carbs):", lblFats: "Yog' (Fats):",
+                btnSaveMeal: "Saqlash", btnCancel: "Bekor qilish",
+                tHistTitle: "Ovqatlanish tarixi", tFavTitle: "Sevimli taomlar", tProfTitle: "Shaxsiy parametrlar va maqsad",
+                lblGender: "Jinsingiz:", optMale: "Erkak", optFemale: "Ayol",
+                lblAge: "Yosh:", lblHeight: "Bo'y (sm):", lblWeight: "Vazn (kg):", lblGoal: "Maqsadingiz:",
+                optLose: "Vazn tashlash (Ozish)", optMaintain: "Vaznni bir xilda saqlash", optGain: "Vazn yig'ish (Massa)",
+                btnSaveProfile: "Hisoblash va saqlash",
+                navHome: "Asosiy", navHistory: "Tarix", navFavorites: "Sevimli", navProfile: "Profil",
+                waterTitle: "Suv balansi (2.0 L)"
+            },
+            ru: {
+                authTitleLogin: "Вход в систему", authTitleReg: "Регистрация",
+                authSubLogin: "Войдите в свой аккаунт для продолжения", authSubReg: "Заполните данные для создания аккаунта",
+                lblName: "Ваше имя", lblEmail: "Email или Телефон", lblPass: "Пароль",
+                btnLogin: "Войти", btnReg: "Зарегистрироваться",
+                switchLogin: "Нет аккаунта? Зарегистрироваться", switchReg: "Уже есть аккаунт? Войти",
+                tDailyNorm: "Дневная норма:", tConsumed: "потреблено:",
+                tUploadTitle: "Загрузите фото еды", tUploadSub: "Сделайте фото или выберите из галереи",
+                tAnalyzeBtn: "AI Анализ", tLoadingText: "Искусственный интеллект анализирует блюдо...",
+                tResultTitle: "Результат анализа",
+                lblFoodName: "Название и состав блюда:", lblCal: "Калории (kcal):", lblProt: "Белки (Protein):", lblCarbs: "Углеводы (Carbs):", lblFats: "Жиры (Fats):",
+                btnSaveMeal: "Сохранить", btnCancel: "Отмена",
+                tHistTitle: "История питания", tFavTitle: "Избранные блюда", tProfTitle: "Личные параметры и цель",
+                lblGender: "Пол:", optMale: "Мужской", optFemale: "Женский",
+                lblAge: "Возраст:", lblHeight: "Рост (см):", lblWeight: "Вес (кг):", lblGoal: "Ваша цель:",
+                optLose: "Сбросить вес (Похудение)", optMaintain: "Поддержание веса", optGain: "Набор массы",
+                btnSaveProfile: "Рассчитать и сохранить",
+                navHome: "Главная", navHistory: "История", navFavorites: "Избранное", navProfile: "Профиль",
+                waterTitle: "Водный баланс (2.0 L)"
+            },
+            en: {
+                authTitleLogin: "Sign In", authTitleReg: "Sign Up",
+                authSubLogin: "Sign in to your account to continue", authSubReg: "Fill in the details to create a new account",
+                lblName: "Your Name", lblEmail: "Email or Phone", lblPass: "Password",
+                btnLogin: "Sign In", btnReg: "Sign Up",
+                switchLogin: "Don't have an account? Sign Up", switchReg: "Already have an account? Sign In",
+                tDailyNorm: "Daily Goal:", tConsumed: "Consumed:",
+                tUploadTitle: "Upload meal photo", tUploadSub: "Take a photo or choose from gallery",
+                tAnalyzeBtn: "AI Analyze", tLoadingText: "Artificial Intelligence is analyzing your meal...",
+                tResultTitle: "Analysis Result",
+                lblFoodName: "Meal name & ingredients:", lblCal: "Calories (kcal):", lblProt: "Protein:", lblCarbs: "Carbs:", lblFats: "Fats:",
+                btnSaveMeal: "Save", btnCancel: "Cancel",
+                tHistTitle: "Meal History", tFavTitle: "Favorite Meals", tProfTitle: "Personal Parameters & Goals",
+                lblGender: "Gender:", optMale: "Male", optFemale: "Female",
+                lblAge: "Age:", lblHeight: "Height (cm):", lblWeight: "Weight (kg):", lblGoal: "Your Goal:",
+                optLose: "Lose Weight", optMaintain: "Maintain Weight", optGain: "Gain Muscle (Mass)",
+                btnSaveProfile: "Calculate & Save",
+                navHome: "Home", navHistory: "History", navFavorites: "Favorites", navProfile: "Profile",
+                waterTitle: "Water Balance (2.0 L)"
+            }
+        };
+
+        window.onload = function() {
+            checkAuth();
+            applyTheme();
+            document.getElementById('langSelect').value = currentLang;
+            applyTranslations();
+            loadProfileData();
+            updateTodaySummary();
+        };
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('weundy_theme', currentTheme);
+            applyTheme();
+        }
+
+        function applyTheme() {
+            const body = document.body;
+            const icon = document.getElementById('themeIcon');
+            if (currentTheme === 'light') {
+                body.className = "bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between overflow-y-auto transition-colors duration-300";
+                icon.className = "fa-solid fa-sun";
+            } else {
+                body.className = "bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between overflow-y-auto transition-colors duration-300";
+                icon.className = "fa-solid fa-moon";
+            }
+        }
+
+        function checkAuth() {
+            const currentUser = localStorage.getItem('weundy_current_user');
+            if (!currentUser) {
+                document.getElementById('authModal').classList.remove('hidden');
+            } else {
+                document.getElementById('authModal').classList.add('hidden');
+            }
+        }
+
+        function toggleAuthMode() {
+            isSignUp = !isSignUp;
+            const t = dict[currentLang];
+            document.getElementById('authTitle').innerText = isSignUp ? t.authTitleReg : t.authTitleLogin;
+            document.getElementById('authSubtitle').innerText = isSignUp ? t.authSubReg : t.authSubLogin;
+            document.getElementById('authSubmitBtn').innerText = isSignUp ? t.btnReg : t.btnLogin;
+            document.getElementById('authSwitchBtn').innerText = isSignUp ? t.switchReg : t.switchLogin;
+            document.getElementById('nameFieldContainer').classList.toggle('hidden', !isSignUp);
+        }
+
+        function handleAuthSubmit() {
+            const email = document.getElementById('authEmail').value;
+            const pass = document.getElementById('authPassword').value;
+            if (!email || !pass) {
+                alert("Iltimos, maydonlarni to'ldiring!");
+                return;
+            }
+            localStorage.setItem('weundy_current_user', email);
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('weundy_current_user');
+            checkAuth();
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('weundy_lang', lang);
+            applyTranslations();
+        }
+
+        function applyTranslations() {
+            const t = dict[currentLang];
+            document.getElementById('tDailyNorm').innerText = t.tDailyNorm;
+            document.getElementById('tConsumed').innerText = t.tConsumed;
+            document.getElementById('waterTitle').innerText = t.waterTitle;
+            document.getElementById('tUploadTitle').innerText = t.tUploadTitle;
+            document.getElementById('tUploadSub').innerText = t.tUploadSub;
+            document.getElementById('tAnalyzeBtn').innerText = t.tAnalyzeBtn;
+            document.getElementById('tLoadingText').innerText = t.tLoadingText;
+            document.getElementById('tResultTitle').innerText = t.tResultTitle;
+            document.getElementById('lblFoodName').innerText = t.lblFoodName;
+            document.getElementById('lblCal').innerText = t.lblCal;
+            document.getElementById('lblProt').innerText = t.lblProt;
+            document.getElementById('lblCarbs').innerText = t.lblCarbs;
+            document.getElementById('lblFats').innerText = t.lblFats;
+            document.getElementById('btnSaveMeal').innerText = t.btnSaveMeal;
+            document.getElementById('btnCancel').innerText = t.btnCancel;
+            document.getElementById('tHistTitle').innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-2 text-blue-500"></i> ${t.tHistTitle}`;
+            document.getElementById('tFavTitle').innerHTML = `<i class="fa-solid fa-star mr-2 text-amber-400"></i> ${t.tFavTitle}`;
+            document.getElementById('tProfTitle').innerHTML = `<i class="fa-solid fa-user mr-2 text-blue-500"></i> ${t.tProfTitle}`;
+            document.getElementById('lblGender').innerText = t.lblGender;
+            document.getElementById('optMale').innerText = t.optMale;
+            document.getElementById('optFemale').innerText = t.optFemale;
+            document.getElementById('lblAge').innerText = t.lblAge;
+            document.getElementById('lblHeight').innerText = t.lblHeight;
+            document.getElementById('lblWeight').innerText = t.lblWeight;
+            document.getElementById('lblGoal').innerText = t.lblGoal;
+            document.getElementById('optLose').innerText = t.optLose;
+            document.getElementById('optMaintain').innerText = t.optMaintain;
+            document.getElementById('optGain').innerText = t.optGain;
+            document.getElementById('btnSaveProfile').innerText = t.btnSaveProfile;
+            document.getElementById('navHomeText').innerText = t.navHome;
+            document.getElementById('navHistText').innerText = t.navHistory;
+            document.getElementById('navFavText').innerText = t.navFavorites;
+            document.getElementById('navProfText').innerText = t.navProfile;
+        }
+
+        function switchTab(tabName) {
+            ['tabHome', 'tabHistory', 'tabFavorites', 'tabProfile'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['navHome', 'navHistory', 'navFavorites', 'navProfile'].forEach(id => document.getElementById(id).className = "flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400");
+
+            if (tabName === 'home') {
+                document.getElementById('tabHome').classList.remove('hidden');
+                document.getElementById('navHome').className = "flex flex-col items-center text-blue-500 cursor-pointer";
+            } else if (tabName === 'history') {
+                document.getElementById('tabHistory').classList.remove('hidden');
+                document.getElementById('navHistory').className = "flex flex-col items-center text-blue-500 cursor-pointer";
+                renderHistory();
+            } else if (tabName === 'favorites') {
+                document.getElementById('tabFavorites').classList.remove('hidden');
+                document.getElementById('navFavorites').className = "flex flex-col items-center text-blue-500 cursor-pointer";
+                renderFavorites();
+            } else if (tabName === 'profile') {
+                document.getElementById('tabProfile').classList.remove('hidden');
+                document.getElementById('navProfile').className = "flex flex-col items-center text-blue-500 cursor-pointer";
+            }
+        }
+
+        function addWater() {
+            let water = parseInt(localStorage.getItem('weundy_water') || '0');
+            if (water < 8) water++;
+            localStorage.setItem('weundy_water', water);
+            updateWaterDisplay();
+        }
+
+        function resetWater() {
+            localStorage.setItem('weundy_water', '0');
+            updateWaterDisplay();
+        }
+
+        function updateWaterDisplay() {
+            let water = localStorage.getItem('weundy_water') || '0';
+            document.getElementById('waterCountDisplay').innerText = water + " / 8 stakan";
+        }
+
+        function previewImage(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imagePreview').src = e.target.result;
+            document.getElementById('imagePreview').classList.remove('hidden');
+            document.getElementById('uploadPlaceholder').classList.add('hidden');
+            
+            // Tugmani qaytadan ko'rsatish va faollashtirish
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.classList.remove('hidden');
+            analyzeBtn.removeAttribute('disabled');
+
+            base64Image = e.target.result.split(',')[1];
+        }
+        reader.readAsDataURL(file);
+    }
+}
+
+        async function analyzeMeal() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const resultCard = document.getElementById('resultCard');
+
+            analyzeBtn.classList.add('hidden');
+            loading.classList.remove('hidden');
+            resultCard.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/analyze-meal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageBase64: base64Image })
+                });
+
+                const result = await response.json();
+                if (result.error) throw new Error(result.error);
+
+                document.getElementById('calorieInput').value = result.calories;
+                document.getElementById('foodItemsInput').value = result.items;
+                document.getElementById('proteinInput').value = result.protein;
+                document.getElementById('carbsInput').value = result.carbs;
+                document.getElementById('fatsInput').value = result.fats;
+
+                loading.classList.add('hidden');
+                resultCard.classList.remove('hidden');
+            } catch (error) {
+                alert("Xatolik: " + error.message);
+                loading.classList.add('hidden');
+                analyzeBtn.classList.remove('hidden');
+            }
+        }
+
+        function saveMealToHistory() {
+            const mealData = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                items: document.getElementById('foodItemsInput').value,
+                calories: document.getElementById('calorieInput').value,
+                protein: document.getElementById('proteinInput').value,
+                carbs: document.getElementById('carbsInput').value,
+                fats: document.getElementById('fatsInput').value
+            };
+
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            history.unshift(mealData);
+            localStorage.setItem('weundy_history', JSON.stringify(history));
+
+            resetApp();
+            updateTodaySummary();
+            switchTab('history');
+        }
+
+        function saveAsFavorite() {
+            const favData = {
+                id: Date.now(),
+                items: document.getElementById('foodItemsInput').value,
+                calories: document.getElementById('calorieInput').value,
+                protein: document.getElementById('proteinInput').value,
+                carbs: document.getElementById('carbsInput').value,
+                fats: document.getElementById('fatsInput').value
+            };
+
+            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
+            favorites.unshift(favData);
+            localStorage.setItem('weundy_favorites', JSON.stringify(favorites));
+            alert("Sevimli taomlarga qo'shildi!");
+        }
+
+        function renderFavorites() {
+            const list = document.getElementById('favoritesList');
+            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
+            if (favorites.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-400 text-center py-6 bg-slate-800 rounded-2xl">Hozircha sevimli taomlar yo'q.</p>`;
+                return;
+            }
+            let html = '';
+            favorites.forEach(item => {
+                html += `
+                    <div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 space-y-2">
+                        <div class="flex justify-between items-center text-xs text-slate-400 border-b border-slate-700 pb-2">
+                            <span class="font-bold text-emerald-400">${item.calories}</span>
+                            <button onclick="addFavToHistory(${item.id})" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-3 py-1 rounded-lg cursor-pointer">Bugunga qo'shish</button>
+                        </div>
+                        <p class="text-sm font-medium text-white">${item.items}</p>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+        }
+
+        function addFavToHistory(id) {
+            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
+            let item = favorites.find(i => i.id === id);
+            if (!item) return;
+
+            const mealData = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                items: item.items,
+                calories: item.calories,
+                protein: item.protein,
+                carbs: item.carbs,
+                fats: item.fats
+            };
+
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            history.unshift(mealData);
+            localStorage.setItem('weundy_history', JSON.stringify(history));
+            updateTodaySummary();
+            switchTab('history');
+        }
+
+        function renderHistory() {
+            const historyList = document.getElementById('historyList');
+            const searchVal = document.getElementById('historySearchInput').value.toLowerCase();
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+
+            if (searchVal) {
+                history = history.filter(i => i.items.toLowerCase().includes(searchVal));
+            }
+
+            if (history.length === 0) {
+                historyList.innerHTML = `<p class="text-xs text-slate-400 text-center py-6 bg-slate-800 rounded-2xl">Tarix topilmadi.</p>`;
+                return;
+            }
+
+            let html = '';
+            history.forEach(item => {
+                html += `
+                    <div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 space-y-2">
+                        <div class="flex justify-between items-center text-xs text-slate-400 border-b border-slate-700 pb-2">
+                            <span><i class="fa-regular fa-clock mr-1"></i> ${item.date}</span>
+                            <span class="font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg">${item.calories}</span>
+                        </div>
+                        <p class="text-sm font-medium text-white">${item.items}</p>
+                        <div class="flex justify-between items-center pt-1">
+                            <div class="flex space-x-3 text-[11px] text-slate-400">
+                                <span>Protein: <b class="text-blue-400">${item.protein}</b></span>
+                                <span>Carbs: <b class="text-amber-400">${item.carbs}</b></span>
+                                <span>Fats: <b class="text-rose-400">${item.fats}</b></span>
+                            </div>
+                            <div class="space-x-2">
+                                <button onclick="editHistoryItem(${item.id})" class="text-xs text-blue-400 hover:underline cursor-pointer"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteHistoryItem(${item.id})" class="text-xs text-rose-400 hover:underline cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            historyList.innerHTML = html;
+        }
+
+        function deleteHistoryItem(id) {
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            history = history.filter(item => item.id !== id);
+            localStorage.setItem('weundy_history', JSON.stringify(history));
+            renderHistory();
+            updateTodaySummary();
+        }
+
+        function editHistoryItem(id) {
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            let item = history.find(i => i.id === id);
+            if (!item) return;
+
+            const newItems = prompt("Taom nomi va tarkibini tahrirlash:", item.items);
+            const newCal = prompt("Kaloriyani tahrirlash:", item.calories);
+            
+            if (newItems !== null && newCal !== null) {
+                item.items = newItems;
+                item.calories = newCal;
+                localStorage.setItem('weundy_history', JSON.stringify(history));
+                renderHistory();
+                updateTodaySummary();
+            }
+        }
+
+        function saveProfile() {
+            const gender = document.getElementById('pGender').value;
+            const age = parseInt(document.getElementById('pAge').value);
+            const height = parseInt(document.getElementById('pHeight').value);
+            const weight = parseInt(document.getElementById('pWeight').value);
+            const goal = document.getElementById('pGoal').value;
+
+            let bmr = (10 * weight) + (6.25 * height) - (5 * age);
+            bmr = (gender === 'male') ? bmr + 5 : bmr - 161;
+            
+            let norm = bmr * 1.2;
+            if (goal === 'lose') norm -= 400;
+            if (goal === 'gain') norm += 400;
+
+            norm = Math.round(norm);
+
+            localStorage.setItem('weundy_norm', norm);
+            localStorage.setItem('weundy_profile', JSON.stringify({gender, age, height, weight, goal}));
+
+            document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
+            alert("Muvaffaqiyatli saqlandi!");
+            switchTab('home');
+        }
+
+        function loadProfileData() {
+            const profile = JSON.parse(localStorage.getItem('weundy_profile') || '{}');
+            if (profile.weight) {
+                document.getElementById('pGender').value = profile.gender;
+                document.getElementById('pAge').value = profile.age;
+                document.getElementById('pHeight').value = profile.height;
+                document.getElementById('pWeight').value = profile.weight;
+                document.getElementById('pGoal').value = profile.goal;
+            }
+            const norm = localStorage.getItem('weundy_norm') || '2000';
+            document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
+            updateWaterDisplay();
+        }
+
+        function updateTodaySummary() {
+            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            let totalCalories = 0;
+            let totalProt = 0, totalCarbs = 0, totalFats = 0;
+            const todayStr = new Date().toLocaleDateString();
+
+            history.forEach(item => {
+                if (item.date.startsWith(todayStr)) {
+                    let match = item.calories.match(/\d+/);
+                    if (match) totalCalories += parseInt(match[0]);
+
+                    let pMatch = item.protein.match(/\d+/);
+                    if (pMatch) totalProt += parseInt(pMatch[0]);
+
+                    let cMatch = item.carbs.match(/\d+/);
+                    if (cMatch) totalCarbs += parseInt(cMatch[0]);
+
+                    let fMatch = item.fats.match(/\d+/);
+                    if (fMatch) totalFats += parseInt(fMatch[0]);
+                }
+            });
+
+            document.getElementById('todayConsumedDisplay').innerText = totalCalories + " kcal";
+            document.getElementById('pCount').innerText = totalProt + "g";
+            document.getElementById('cCount').innerText = totalCarbs + "g";
+            document.getElementById('fCount').innerText = totalFats + "g";
+        }
+
+        function resetApp() {
+            document.getElementById('fileInput').value = "";
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+            document.getElementById('analyzeBtn').classList.add('hidden');
+            document.getElementById('resultCard').classList.add('hidden');
+            base64Image = "";
+        }
+    </script>
+</body>
+</html>
