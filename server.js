@@ -9,9 +9,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 
-// ===============================
+// ==================================================
 // MIDDLEWARE
-// ===============================
+// ==================================================
 
 app.use(cors());
 
@@ -22,16 +22,14 @@ app.use(express.json({
 app.use(express.static('public'));
 
 
-// ===============================
+// ==================================================
 // MONGODB CONNECTION
-// ===============================
+// ==================================================
 
 mongoose.connect(process.env.MONGO_URI)
-
     .then(() => {
         console.log('MongoDB-ga muvaffaqiyatli ulandi!');
     })
-
     .catch((err) => {
         console.error(
             'MongoDB-ga ulanishda xatolik:',
@@ -40,9 +38,9 @@ mongoose.connect(process.env.MONGO_URI)
     });
 
 
-// ===============================
-// DATABASE SCHEMAS & MODELS
-// ===============================
+// ==================================================
+// DATABASE SCHEMAS
+// ==================================================
 
 const UserSchema = new mongoose.Schema({
 
@@ -86,6 +84,10 @@ const FoodLogSchema = new mongoose.Schema({
 });
 
 
+// ==================================================
+// DATABASE MODELS
+// ==================================================
+
 const User = mongoose.model(
     'User',
     UserSchema
@@ -97,9 +99,9 @@ const FoodLog = mongoose.model(
 );
 
 
-// ===============================
-// ANALYZE MEAL - GROQ VISION API
-// ===============================
+// ==================================================
+// ANALYZE MEAL - GROQ VISION
+// ==================================================
 
 app.post('/api/analyze-meal', async (req, res) => {
 
@@ -111,22 +113,22 @@ app.post('/api/analyze-meal', async (req, res) => {
         } = req.body;
 
 
-        // ===============================
+        // ------------------------------------------
         // CHECK IMAGE
-        // ===============================
+        // ------------------------------------------
 
         if (!imageBase64) {
 
             return res.status(400).json({
-                error: "Rasm topilmadi!"
+                error: 'Rasm topilmadi!'
             });
 
         }
 
 
-        // ===============================
+        // ------------------------------------------
         // GROQ API KEY
-        // ===============================
+        // ------------------------------------------
 
         const apiKey =
             process.env.GROQ_API_KEY;
@@ -135,75 +137,68 @@ app.post('/api/analyze-meal', async (req, res) => {
         if (!apiKey) {
 
             throw new Error(
-                "GROQ_API_KEY muhit o'zgaruvchisi topilmadi!"
+                'GROQ_API_KEY muhit o\'zgaruvchisi topilmadi!'
             );
 
         }
 
 
-        // ===============================
-        // GROQ API REQUEST
-        // ===============================
+        // ------------------------------------------
+        // GROQ REQUEST
+        // ------------------------------------------
 
         const response = await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
+            'https://api.groq.com/openai/v1/chat/completions',
             {
-
-                method: "POST",
+                method: 'POST',
 
                 headers: {
-
-                    "Authorization":
-                        `Bearer ${apiKey}`,
-
-                    "Content-Type":
-                        "application/json"
-
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
                 },
 
                 body: JSON.stringify({
 
-                    // ===============================
-                    // YANGI VISION MODEL
-                    // ===============================
+                    // --------------------------------
+                    // CURRENT GROQ VISION MODEL
+                    // --------------------------------
 
-                    model:
-                        "qwen/qwen3.8-27b",
+                    model: 'qwen/qwen3.8-27b',
 
+
+                    // --------------------------------
+                    // MESSAGES
+                    // --------------------------------
 
                     messages: [
 
                         {
-
-                            role: "user",
+                            role: 'user',
 
                             content: [
 
-                                // ===============================
-                                // TEXT PROMPT
-                                // ===============================
+                                // ==========================
+                                // TEXT
+                                // ==========================
 
                                 {
-
-                                    type: "text",
+                                    type: 'text',
 
                                     text: `
 Bu rasmdagi taomni tahlil qil.
 
-Taomning:
+Quyidagilarni aniqlashga harakat qil:
 
-1. Nomini
-2. Tarkibini
-3. Taxminiy kaloriyasini
-4. Protein miqdorini
-5. Uglevod miqdorini
-6. Yog' miqdorini
-
-aniqla.
+1. Taom nomi
+2. Taom tarkibi
+3. Taxminiy kaloriya
+4. Protein
+5. Uglevod
+6. Yog'
 
 Rasmga qarab taxminiy qiymatlarni hisobla.
 
-Javobni FAQAT quyidagi JSON formatida ber:
+Natijani FAQAT quyidagi JSON formatida qaytar:
 
 {
     "calories": "485 kcal",
@@ -214,58 +209,42 @@ Javobni FAQAT quyidagi JSON formatida ber:
 }
 
 Hech qanday qo'shimcha matn yozma.
-
 Faqat JSON qaytar.
 `
-
                                 },
 
 
-                                // ===============================
+                                // ==========================
                                 // IMAGE
-                                // ===============================
+                                // ==========================
 
                                 {
-
-                                    type: "image_url",
+                                    type: 'image_url',
 
                                     image_url: {
-
                                         url:
                                             `data:image/jpeg;base64,${imageBase64}`
-
                                     }
-
                                 }
 
                             ]
-
                         }
 
                     ],
 
 
-                    // ===============================
-                    // JSON MODE
-                    // ===============================
+                    // --------------------------------
+                    // JSON RESPONSE
+                    // --------------------------------
 
                     response_format: {
-
-                        type: "json_object"
-
+                        type: 'json_object'
                     },
 
 
-                    // ===============================
-                    // REASONINGNI O'CHIRISH
-                    // ===============================
-
-                    reasoning_effort: "none",
-
-
-                    // ===============================
-                    // MAX OUTPUT
-                    // ===============================
+                    // --------------------------------
+                    // MAX TOKENS
+                    // --------------------------------
 
                     max_completion_tokens: 500
 
@@ -275,38 +254,35 @@ Faqat JSON qaytar.
         );
 
 
-        // ===============================
-        // GROQ RESPONSE
-        // ===============================
+        // ------------------------------------------
+        // READ RESPONSE
+        // ------------------------------------------
 
         const data =
             await response.json();
 
 
         console.log(
-            "Groq status:",
+            'Groq status:',
             response.status
         );
 
 
         console.log(
-            "Groq response:",
+            'Groq response:',
             data
         );
 
 
-        // ===============================
-        // API ERROR
-        // ===============================
+        // ------------------------------------------
+        // CHECK GROQ ERROR
+        // ------------------------------------------
 
         if (!response.ok) {
 
             throw new Error(
-
                 data.error?.message ||
-
                 `Groq API xatosi: ${response.status}`
-
             );
 
         }
@@ -321,9 +297,9 @@ Faqat JSON qaytar.
         }
 
 
-        // ===============================
-        // CHECK AI RESPONSE
-        // ===============================
+        // ------------------------------------------
+        // CHECK CHOICES
+        // ------------------------------------------
 
         if (
             !data.choices ||
@@ -332,15 +308,15 @@ Faqat JSON qaytar.
         ) {
 
             throw new Error(
-                "Groq AI javob qaytarmadi."
+                'Groq AI javob qaytarmadi.'
             );
 
         }
 
 
-        // ===============================
-        // GET AI CONTENT
-        // ===============================
+        // ------------------------------------------
+        // GET AI RESPONSE
+        // ------------------------------------------
 
         const rawContent =
             data.choices[0]
@@ -349,40 +325,39 @@ Faqat JSON qaytar.
 
 
         console.log(
-            "AI javobi:",
+            'AI javobi:',
             rawContent
         );
 
 
-        // ===============================
+        // ------------------------------------------
         // PARSE JSON
-        // ===============================
+        // ------------------------------------------
 
         const resultData =
             JSON.parse(rawContent);
 
 
-        // ===============================
-        // SAVE TO DATABASE
-        // ===============================
+        // ==================================================
+        // SAVE TO MONGODB
+        // ==================================================
 
         if (deviceId) {
 
             try {
 
-                // ===============================
-                // USER
-                // ===============================
+                // --------------------------------------
+                // CREATE / UPDATE USER
+                // --------------------------------------
 
                 await User.findOneAndUpdate(
 
                     {
-                        deviceId
+                        deviceId: deviceId
                     },
 
                     {
-                        lastActive:
-                            Date.now()
+                        lastActive: Date.now()
                     },
 
                     {
@@ -393,9 +368,9 @@ Faqat JSON qaytar.
                 );
 
 
-                // ===============================
+                // --------------------------------------
                 // CONVERT NUMBERS
-                // ===============================
+                // --------------------------------------
 
                 const cleanCal =
                     parseInt(
@@ -421,14 +396,14 @@ Faqat JSON qaytar.
                     ) || 0;
 
 
-                // ===============================
-                // FOOD LOG
-                // ===============================
+                // --------------------------------------
+                // CREATE FOOD LOG
+                // --------------------------------------
 
                 const newLog =
                     new FoodLog({
 
-                        deviceId,
+                        deviceId: deviceId,
 
                         foodName:
                             resultData.items,
@@ -448,18 +423,22 @@ Faqat JSON qaytar.
                     });
 
 
+                // --------------------------------------
+                // SAVE
+                // --------------------------------------
+
                 await newLog.save();
 
 
                 console.log(
-                    "Taom ma'lumotlari MongoDB-ga saqlandi."
+                    'Taom MongoDB-ga saqlandi!'
                 );
 
 
             } catch (dbErr) {
 
                 console.error(
-                    "Bazaga saqlashda xatolik:",
+                    'Bazaga saqlashda xatolik:',
                     dbErr
                 );
 
@@ -468,9 +447,9 @@ Faqat JSON qaytar.
         }
 
 
-        // ===============================
-        // SEND RESULT
-        // ===============================
+        // ------------------------------------------
+        // SEND RESULT TO APP
+        // ------------------------------------------
 
         res.json(
             resultData
@@ -480,7 +459,7 @@ Faqat JSON qaytar.
     } catch (error) {
 
         console.error(
-            "XATOLIK:",
+            'XATOLIK:',
             error
         );
 
@@ -488,8 +467,8 @@ Faqat JSON qaytar.
         res.status(500).json({
 
             error:
-                "Groq AIni ishlatishda xatolik yuz berdi: "
-                + error.message
+                'Groq AIni ishlatishda xatolik yuz berdi: ' +
+                error.message
 
         });
 
@@ -498,9 +477,9 @@ Faqat JSON qaytar.
 });
 
 
-// ===============================
-// SAVE FOOD MANUALLY
-// ===============================
+// ==================================================
+// MANUAL SAVE FOOD
+// ==================================================
 
 app.post('/api/save-food', async (req, res) => {
 
@@ -516,19 +495,18 @@ app.post('/api/save-food', async (req, res) => {
         } = req.body;
 
 
-        // ===============================
+        // ------------------------------------------
         // UPDATE USER
-        // ===============================
+        // ------------------------------------------
 
         await User.findOneAndUpdate(
 
             {
-                deviceId
+                deviceId: deviceId
             },
 
             {
-                lastActive:
-                    Date.now()
+                lastActive: Date.now()
             },
 
             {
@@ -539,27 +517,31 @@ app.post('/api/save-food', async (req, res) => {
         );
 
 
-        // ===============================
-        // SAVE FOOD
-        // ===============================
+        // ------------------------------------------
+        // CREATE FOOD LOG
+        // ------------------------------------------
 
         const newLog =
             new FoodLog({
 
-                deviceId,
+                deviceId: deviceId,
 
-                foodName,
+                foodName: foodName,
 
-                calories,
+                calories: calories,
 
-                protein,
+                protein: protein,
 
-                fat,
+                fat: fat,
 
-                carbs
+                carbs: carbs
 
             });
 
+
+        // ------------------------------------------
+        // SAVE FOOD
+        // ------------------------------------------
 
         await newLog.save();
 
@@ -569,20 +551,23 @@ app.post('/api/save-food', async (req, res) => {
             success: true,
 
             message:
-                "Ma'lumot bazaga saqlandi!"
+                'Ma\'lumot bazaga saqlandi!'
 
         });
 
 
     } catch (err) {
 
-        console.error(err);
+        console.error(
+            'Manual save error:',
+            err
+        );
 
 
         res.status(500).json({
 
             error:
-                "Saqlashda xatolik yuz berdi"
+                'Saqlashda xatolik yuz berdi'
 
         });
 
@@ -591,9 +576,9 @@ app.post('/api/save-food', async (req, res) => {
 });
 
 
-// ===============================
-// ADMIN AUTH
-// ===============================
+// ==================================================
+// ADMIN AUTHENTICATION
+// ==================================================
 
 const adminAuth =
     basicAuth({
@@ -613,9 +598,9 @@ const adminAuth =
     });
 
 
-// ===============================
+// ==================================================
 // ADMIN STATS API
-// ===============================
+// ==================================================
 
 app.get(
     '/api/admin/stats',
@@ -624,13 +609,25 @@ app.get(
 
         try {
 
+            // --------------------------------------
+            // TOTAL USERS
+            // --------------------------------------
+
             const totalUsers =
                 await User.countDocuments();
 
 
+            // --------------------------------------
+            // TOTAL SCANS
+            // --------------------------------------
+
             const totalScans =
                 await FoodLog.countDocuments();
 
+
+            // --------------------------------------
+            // RECENT LOGS
+            // --------------------------------------
 
             const recentLogs =
                 await FoodLog
@@ -641,26 +638,36 @@ app.get(
                     .limit(10);
 
 
+            // --------------------------------------
+            // RESPONSE
+            // --------------------------------------
+
             res.json({
 
-                totalUsers,
+                totalUsers:
+                    totalUsers,
 
-                totalScans,
+                totalScans:
+                    totalScans,
 
-                recentLogs
+                recentLogs:
+                    recentLogs
 
             });
 
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                'Admin stats error:',
+                err
+            );
 
 
             res.status(500).json({
 
                 error:
-                    "Server xatoligi"
+                    'Server xatoligi'
 
             });
 
@@ -670,42 +677,31 @@ app.get(
 );
 
 
-// ===============================
+// ==================================================
 // SERVER START
-// ===============================
+// ==================================================
 
 app.listen(
     PORT,
     () => {
 
-        console.log("");
-        console.log(
-            "===================================="
-        );
+        console.log('');
+        console.log('====================================');
+        console.log('       WEUNDY MEAL AI SERVER');
+        console.log('====================================');
+        console.log('');
 
         console.log(
-            "        WEUNDY MEAL AI SERVER"
+            `Server: http://localhost:${PORT}`
         );
+
+        console.log('');
 
         console.log(
-            "===================================="
+            'Groq Vision: qwen/qwen3.8-27b'
         );
 
-        console.log("");
-
-        console.log(
-            `Server:
-http://localhost:${PORT}`
-        );
-
-        console.log("");
-
-        console.log(
-            "Groq Vision:
-qwen/qwen3.8-27b"
-        );
-
-        console.log("");
+        console.log('');
 
     }
 );
