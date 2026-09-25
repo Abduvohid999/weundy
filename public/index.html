@@ -175,14 +175,13 @@
             <div class="flex justify-between items-center">
                 <h2 id="tHistTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-clock-rotate-left mr-2 text-blue-500"></i> Ovqatlanish tarixi</h2>
             </div>
-            <!-- Search & Filter Bar -->
             <div>
                 <input type="text" id="historySearchInput" oninput="renderHistory()" placeholder="Taomni qidirish..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
             </div>
             <div id="historyList" class="space-y-3"></div>
         </div>
 
-        <!-- TAB 3: SEVIMLILAR / RETSEPTLAR -->
+        <!-- TAB 3: SEVIMLILAR -->
         <div id="tabFavorites" class="hidden space-y-4">
             <h2 id="tFavTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-star mr-2 text-amber-400"></i> Sevimli taomlar</h2>
             <div id="favoritesList" class="space-y-3"></div>
@@ -229,7 +228,7 @@
             </div>
         </div>
 
-        <!-- TAB 5: ADMIN PANEL (FAQAT ADMIN UCHUN) -->
+        <!-- TAB 5: ADMIN PANEL -->
         <div id="tabAdmin" class="hidden space-y-4">
             <div class="flex justify-between items-center">
                 <h2 class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-shield-halved mr-2 text-rose-500"></i> Admin Panel</h2>
@@ -259,7 +258,6 @@
         let currentLang = localStorage.getItem('weundy_lang') || 'uz';
         let currentTheme = localStorage.getItem('weundy_theme') || 'dark';
 
-        // Maxsus admin emaili (Siz ushbu email bilan kirsangiz Admin panel ochiladi)
         const ADMIN_EMAIL = "admin@weundy.uz";
 
         const dict = {
@@ -280,8 +278,7 @@
                 lblAge: "Yosh:", lblHeight: "Bo'y (sm):", lblWeight: "Vazn (kg):", lblGoal: "Maqsadingiz:",
                 optLose: "Vazn tashlash (Ozish)", optMaintain: "Vaznni bir xilda saqlash", optGain: "Vazn yig'ish (Massa)",
                 btnSaveProfile: "Hisoblash va saqlash",
-                navHome: "Asosiy", navHistory: "Tarix", navFavorites: "Sevimli", navProfile: "Profil",
-                waterTitle: "Suv balansi (2.0 L)"
+                navHome: "Asosiy", navHistory: "Tarix", navFavorites: "Sevimli", navProfile: "Profil"
             },
             ru: {
                 authTitleLogin: "Вход в систему", authTitleReg: "Регистрация",
@@ -300,8 +297,7 @@
                 lblAge: "Возраст:", lblHeight: "Рост (см):", lblWeight: "Вес (кг):", lblGoal: "Ваша цель:",
                 optLose: "Сбросить вес (Похудение)", optMaintain: "Поддержание веса", optGain: "Набор массы",
                 btnSaveProfile: "Рассчитать и сохранить",
-                navHome: "Главная", navHistory: "История", navFavorites: "Избранное", navProfile: "Профиль",
-                waterTitle: "Водный баланс (2.0 L)"
+                navHome: "Главная", navHistory: "История", navFavorites: "Избранное", navProfile: "Профиль"
             },
             en: {
                 authTitleLogin: "Sign In", authTitleReg: "Sign Up",
@@ -320,8 +316,7 @@
                 lblAge: "Age:", lblHeight: "Height (cm):", lblWeight: "Weight (kg):", lblGoal: "Your Goal:",
                 optLose: "Lose Weight", optMaintain: "Maintain Weight", optGain: "Gain Muscle (Mass)",
                 btnSaveProfile: "Calculate & Save",
-                navHome: "Home", navHistory: "History", navFavorites: "Favorites", navProfile: "Profile",
-                waterTitle: "Water Balance (2.0 L)"
+                navHome: "Home", navHistory: "History", navFavorites: "Favorites", navProfile: "Profile"
             }
         };
 
@@ -423,7 +418,6 @@
                     return;
                 }
 
-                // Oxirgi kirgan vaqtini yangilash
                 user.lastLogin = nowTime;
                 localStorage.setItem('weundy_users', JSON.stringify(users));
 
@@ -461,7 +455,6 @@
             const t = dict[currentLang];
             document.getElementById('tDailyNorm').innerText = t.tDailyNorm;
             document.getElementById('tConsumed').innerText = t.tConsumed;
-            document.getElementById('waterTitle').innerText = t.waterTitle;
             document.getElementById('tUploadTitle').innerText = t.tUploadTitle;
             document.getElementById('tUploadSub').innerText = t.tUploadSub;
             document.getElementById('tAnalyzeBtn').innerText = t.tAnalyzeBtn;
@@ -527,7 +520,6 @@
             }
         }
 
-        // --- ADMIN PANELNI RENDERING QILISH ---
         function renderAdminPanel() {
             let users = JSON.parse(localStorage.getItem('weundy_users') || '[]');
             document.getElementById('totalUsersBadge').innerText = `Jami: ${users.length} ta`;
@@ -561,14 +553,26 @@
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
+        // --- SUV VA KALORIYANING SHAXSIY HISOBLANISHI ---
+        function getUserWaterGoal() {
+            let email = getCurrentUserEmail();
+            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
+            let profile = allProfiles[email];
+            if (profile && profile.waterGlasses) {
+                return { glasses: profile.waterGlasses, liters: profile.waterLiters };
+            }
+            return { glasses: 8, liters: "2.0" }; // Standart qiymat profil to'ldirilmaguncha
+        }
+
         function addWater() {
             let email = getCurrentUserEmail();
             let today = getTodayKey();
+            let goalObj = getUserWaterGoal();
             let allWaterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
             if (!allWaterData[email]) allWaterData[email] = {};
             
             let currentWater = allWaterData[email][today] || 0;
-            if (currentWater < 8) currentWater++;
+            if (currentWater < goalObj.glasses) currentWater++;
             allWaterData[email][today] = currentWater;
             
             localStorage.setItem('weundy_water_records', JSON.stringify(allWaterData));
@@ -589,9 +593,68 @@
         function updateWaterDisplay() {
             let email = getCurrentUserEmail();
             let today = getTodayKey();
+            let goalObj = getUserWaterGoal();
             let allWaterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
             let water = (allWaterData[email] && allWaterData[email][today]) ? allWaterData[email][today] : 0;
-            document.getElementById('waterCountDisplay').innerText = water + " / 8 stakan";
+            
+            document.getElementById('waterTitle').innerText = `Suv balansi (${goalObj.liters} L)`;
+            document.getElementById('waterCountDisplay').innerText = `${water} / ${goalObj.glasses} stakan`;
+        }
+
+        function saveProfile() {
+            let email = getCurrentUserEmail();
+            const gender = document.getElementById('pGender').value;
+            const age = parseInt(document.getElementById('pAge').value);
+            const height = parseInt(document.getElementById('pHeight').value);
+            const weight = parseInt(document.getElementById('pWeight').value);
+            const goal = document.getElementById('pGoal').value;
+
+            // 1. Kaloriya normasi (Mifflin-St Jeor formulasi)
+            let bmr = (10 * weight) + (6.25 * height) - (5 * age);
+            bmr = (gender === 'male') ? bmr + 5 : bmr - 161;
+            
+            let norm = bmr * 1.2; // Kam harakatli turmush tarzi koeffitsiyenti
+            if (goal === 'lose') norm -= 400; // Ozish uchun
+            if (goal === 'gain') norm += 400; // Massa yig'ish uchun
+            norm = Math.round(norm);
+
+            // 2. Suv normasi (Vaznga qarab: 1 kg uchun ~35 ml, 1 stakan = 250 ml)
+            let totalWaterMl = weight * 35;
+            let waterGlasses = Math.round(totalWaterMl / 250);
+            let waterLiters = (totalWaterMl / 1000).toFixed(1);
+
+            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
+            allProfiles[email] = { gender, age, height, weight, goal, norm, waterGlasses, waterLiters };
+            localStorage.setItem('weundy_all_profiles', JSON.stringify(allProfiles));
+
+            document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
+            updateWaterDisplay();
+
+            alert("Parametrlaringiz muvaffaqiyatli saqlandi va kaloriya/suv normangiz moslashtirildi!");
+            switchTab('home');
+        }
+
+        function loadProfileData() {
+            let email = getCurrentUserEmail();
+            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
+            let profile = allProfiles[email];
+
+            if (profile) {
+                document.getElementById('pGender').value = profile.gender;
+                document.getElementById('pAge').value = profile.age;
+                document.getElementById('pHeight').value = profile.height;
+                document.getElementById('pWeight').value = profile.weight;
+                document.getElementById('pGoal').value = profile.goal;
+                document.getElementById('dailyNormDisplay').innerText = profile.norm + " kcal";
+            } else {
+                document.getElementById('pGender').value = "male";
+                document.getElementById('pAge').value = 20;
+                document.getElementById('pHeight').value = 175;
+                document.getElementById('pWeight').value = 70;
+                document.getElementById('pGoal').value = "maintain";
+                document.getElementById('dailyNormDisplay').innerText = "2000 kcal";
+            }
+            updateWaterDisplay();
         }
 
         function previewImage(event) {
@@ -814,54 +877,6 @@
                 localStorage.setItem('weundy_all_history', JSON.stringify(allHistory));
                 renderHistory();
                 updateTodaySummary();
-            }
-        }
-
-        function saveProfile() {
-            let email = getCurrentUserEmail();
-            const gender = document.getElementById('pGender').value;
-            const age = parseInt(document.getElementById('pAge').value);
-            const height = parseInt(document.getElementById('pHeight').value);
-            const weight = parseInt(document.getElementById('pWeight').value);
-            const goal = document.getElementById('pGoal').value;
-
-            let bmr = (10 * weight) + (6.25 * height) - (5 * age);
-            bmr = (gender === 'male') ? bmr + 5 : bmr - 161;
-            
-            let norm = bmr * 1.2;
-            if (goal === 'lose') norm -= 400;
-            if (goal === 'gain') norm += 400;
-
-            norm = Math.round(norm);
-
-            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
-            allProfiles[email] = { gender, age, height, weight, goal, norm };
-            localStorage.setItem('weundy_all_profiles', JSON.stringify(allProfiles));
-
-            document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
-            alert("Muvaffaqiyatli saqlandi!");
-            switchTab('home');
-        }
-
-        function loadProfileData() {
-            let email = getCurrentUserEmail();
-            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
-            let profile = allProfiles[email];
-
-            if (profile) {
-                document.getElementById('pGender').value = profile.gender;
-                document.getElementById('pAge').value = profile.age;
-                document.getElementById('pHeight').value = profile.height;
-                document.getElementById('pWeight').value = profile.weight;
-                document.getElementById('pGoal').value = profile.goal;
-                document.getElementById('dailyNormDisplay').innerText = profile.norm + " kcal";
-            } else {
-                document.getElementById('pGender').value = "male";
-                document.getElementById('pAge').value = 20;
-                document.getElementById('pHeight').value = 175;
-                document.getElementById('pWeight').value = 70;
-                document.getElementById('pGoal').value = "maintain";
-                document.getElementById('dailyNormDisplay').innerText = "2000 kcal";
             }
         }
 
