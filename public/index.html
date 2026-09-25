@@ -193,7 +193,7 @@
             <h2 id="tProfTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-user mr-2 text-blue-500"></i> Shaxsiy parametrlar va maqsad</h2>
             <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3 text-sm">
                 <div>
-                    <label id="lblGender" class="text-xs text-slate-400">Jinsingiz:</label>
+                    <label id="lblGender" class="xs text-slate-400">Jinsingiz:</label>
                     <select id="pGender" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 text-white">
                         <option value="male" id="optMale">Erkak</option>
                         <option value="female" id="optFemale">Ayol</option>
@@ -312,6 +312,7 @@
             applyTranslations();
             loadProfileData();
             updateTodaySummary();
+            updateWaterDisplay();
         };
 
         function toggleTheme() {
@@ -431,42 +432,55 @@
             }
         }
 
+        // --- YANGILANGAN SUV MANTIQI (SANAGA BOG'LANGAN) ---
+        function getTodayKey() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
         function addWater() {
-            let water = parseInt(localStorage.getItem('weundy_water') || '0');
-            if (water < 8) water++;
-            localStorage.setItem('weundy_water', water);
+            let today = getTodayKey();
+            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            let currentWater = waterData[today] || 0;
+            if (currentWater < 8) currentWater++;
+            waterData[today] = currentWater;
+            localStorage.setItem('weundy_water_records', JSON.stringify(waterData));
             updateWaterDisplay();
         }
 
         function resetWater() {
-            localStorage.setItem('weundy_water', '0');
+            let today = getTodayKey();
+            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            waterData[today] = 0;
+            localStorage.setItem('weundy_water_records', JSON.stringify(waterData));
             updateWaterDisplay();
         }
 
         function updateWaterDisplay() {
-            let water = localStorage.getItem('weundy_water') || '0';
+            let today = getTodayKey();
+            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            let water = waterData[today] || 0;
             document.getElementById('waterCountDisplay').innerText = water + " / 8 stakan";
         }
 
         function previewImage(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('imagePreview').src = e.target.result;
-            document.getElementById('imagePreview').classList.remove('hidden');
-            document.getElementById('uploadPlaceholder').classList.add('hidden');
-            
-            // Tugmani qaytadan ko'rsatish va faollashtirish
-            const analyzeBtn = document.getElementById('analyzeBtn');
-            analyzeBtn.classList.remove('hidden');
-            analyzeBtn.removeAttribute('disabled');
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imagePreview').src = e.target.result;
+                    document.getElementById('imagePreview').classList.remove('hidden');
+                    document.getElementById('uploadPlaceholder').classList.add('hidden');
+                    
+                    const analyzeBtn = document.getElementById('analyzeBtn');
+                    analyzeBtn.classList.remove('hidden');
+                    analyzeBtn.removeAttribute('disabled');
 
-            base64Image = e.target.result.split(',')[1];
+                    base64Image = e.target.result.split(',')[1];
+                }
+                reader.readAsDataURL(file);
+            }
         }
-        reader.readAsDataURL(file);
-    }
-}
 
         async function analyzeMeal() {
             const analyzeBtn = document.getElementById('analyzeBtn');
@@ -502,10 +516,13 @@
             }
         }
 
+        // --- TAOMNI SAQLASH (ANIQ SANA BILAN) ---
         function saveMealToHistory() {
+            const now = new Date();
             const mealData = {
                 id: Date.now(),
-                date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                rawDate: now.toISOString().split('T')[0], // YYYY-MM-DD format (kunlik hisob uchun)
+                date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), // Chiqarish uchun
                 items: document.getElementById('foodItemsInput').value,
                 calories: document.getElementById('calorieInput').value,
                 protein: document.getElementById('proteinInput').value,
@@ -565,9 +582,11 @@
             let item = favorites.find(i => i.id === id);
             if (!item) return;
 
+            const now = new Date();
             const mealData = {
                 id: Date.now(),
-                date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                rawDate: now.toISOString().split('T')[0],
+                date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 items: item.items,
                 calories: item.calories,
                 protein: item.protein,
@@ -682,17 +701,20 @@
             }
             const norm = localStorage.getItem('weundy_norm') || '2000';
             document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
-            updateWaterDisplay();
         }
 
+        // --- FAQAT BUGUNGI KUN KONSUMATSIYASINI HISOBLASH ---
         function updateTodaySummary() {
             let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
             let totalCalories = 0;
             let totalProt = 0, totalCarbs = 0, totalFats = 0;
-            const todayStr = new Date().toLocaleDateString();
+            const todayKey = getTodayKey(); // Masalan: "2026-09-25"
 
             history.forEach(item => {
-                if (item.date.startsWith(todayStr)) {
+                // Eski yozuvlarda rawDate bo'lmasa date stringidan tekshiradi, yangilarida esa aniq rawDate solishtiriladi
+                let isToday = item.rawDate ? (item.rawDate === todayKey) : item.date.startsWith(new Date().toLocaleDateString());
+
+                if (isToday) {
                     let match = item.calories.match(/\d+/);
                     if (match) totalCalories += parseInt(match[0]);
 
