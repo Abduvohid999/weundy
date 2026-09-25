@@ -229,6 +229,18 @@
             </div>
         </div>
 
+        <!-- TAB 5: ADMIN PANEL (FAQAT ADMIN UCHUN) -->
+        <div id="tabAdmin" class="hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-shield-halved mr-2 text-rose-500"></i> Admin Panel</h2>
+                <span id="totalUsersBadge" class="bg-blue-600/20 text-blue-400 text-xs font-bold px-2.5 py-1 rounded-xl border border-blue-500/30">Jami: 0 ta</span>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
+                <p class="text-xs text-slate-400">Barcha ro'yxatdan o'tgan foydalanuvchilar, ularning parollari va oxirgi faollik vaqti:</p>
+                <div id="adminUsersList" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Footer Navigation -->
@@ -237,6 +249,7 @@
         <button onclick="switchTab('history')" id="navHistory" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-clock-rotate-left text-base"></i><span class="mt-1" id="navHistText">Tarix</span></button>
         <button onclick="switchTab('favorites')" id="navFavorites" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-star text-base"></i><span class="mt-1" id="navFavText">Sevimli</span></button>
         <button onclick="switchTab('profile')" id="navProfile" class="flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400"><i class="fa-solid fa-user text-base"></i><span class="mt-1" id="navProfText">Profil</span></button>
+        <button onclick="switchTab('admin')" id="navAdmin" class="hidden flex flex-col items-center hover:text-slate-200 cursor-pointer text-rose-400"><i class="fa-solid fa-shield-halved text-base"></i><span class="mt-1">Admin</span></button>
     </footer>
 
     <!-- JavaScript Logic -->
@@ -245,6 +258,9 @@
         let isSignUp = false;
         let currentLang = localStorage.getItem('weundy_lang') || 'uz';
         let currentTheme = localStorage.getItem('weundy_theme') || 'dark';
+
+        // Maxsus admin emaili (Siz ushbu email bilan kirsangiz Admin panel ochiladi)
+        const ADMIN_EMAIL = "admin@weundy.uz";
 
         const dict = {
             uz: {
@@ -341,6 +357,16 @@
             } else {
                 document.getElementById('authModal').classList.add('hidden');
                 loadUserDataForCurrentAccount();
+                checkAdminAccess(currentUser);
+            }
+        }
+
+        function checkAdminAccess(email) {
+            const adminBtn = document.getElementById('navAdmin');
+            if (email === ADMIN_EMAIL) {
+                adminBtn.classList.remove('hidden');
+            } else {
+                adminBtn.classList.add('hidden');
             }
         }
 
@@ -354,7 +380,6 @@
             document.getElementById('nameFieldContainer').classList.toggle('hidden', !isSignUp);
         }
 
-        // --- REAL AVTORIZATSIYA VA TEKSHIRUV MANTIQI ---
         function handleAuthSubmit() {
             const email = document.getElementById('authEmail').value.trim();
             const pass = document.getElementById('authPassword').value.trim();
@@ -366,9 +391,9 @@
             }
 
             let users = JSON.parse(localStorage.getItem('weundy_users') || '[]');
+            const nowTime = new Date().toLocaleString();
 
             if (isSignUp) {
-                // Ro'yxatdan o'tish rejimi
                 if (!name) {
                     alert("Iltimos, ismingizni kiriting!");
                     return;
@@ -379,16 +404,15 @@
                     return;
                 }
 
-                // Yangi foydalanuvchi yaratish
-                let newUser = { name, email, pass };
+                let newUser = { name, email, pass, lastLogin: nowTime };
                 users.push(newUser);
                 localStorage.setItem('weundy_users', JSON.stringify(users));
                 localStorage.setItem('weundy_current_user', email);
                 
                 document.getElementById('authModal').classList.add('hidden');
                 loadUserDataForCurrentAccount();
+                checkAdminAccess(email);
             } else {
-                // Tizimga kirish rejimi
                 let user = users.find(u => u.email === email);
                 if (!user) {
                     alert("Bunday hisob topilmadi. Iltimos, oldin ro'yxatdan o'ting!");
@@ -399,9 +423,14 @@
                     return;
                 }
 
+                // Oxirgi kirgan vaqtini yangilash
+                user.lastLogin = nowTime;
+                localStorage.setItem('weundy_users', JSON.stringify(users));
+
                 localStorage.setItem('weundy_current_user', email);
                 document.getElementById('authModal').classList.add('hidden');
                 loadUserDataForCurrentAccount();
+                checkAdminAccess(email);
             }
         }
 
@@ -466,8 +495,16 @@
         }
 
         function switchTab(tabName) {
-            ['tabHome', 'tabHistory', 'tabFavorites', 'tabProfile'].forEach(id => document.getElementById(id).classList.add('hidden'));
-            ['navHome', 'navHistory', 'navFavorites', 'navProfile'].forEach(id => document.getElementById(id).className = "flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400");
+            ['tabHome', 'tabHistory', 'tabFavorites', 'tabProfile', 'tabAdmin'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+            ['navHome', 'navHistory', 'navFavorites', 'navProfile', 'navAdmin'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.classList.contains('hidden') || id !== 'navAdmin') {
+                    el.className = "flex flex-col items-center hover:text-slate-200 cursor-pointer text-slate-400";
+                }
+            });
 
             if (tabName === 'home') {
                 document.getElementById('tabHome').classList.remove('hidden');
@@ -483,7 +520,40 @@
             } else if (tabName === 'profile') {
                 document.getElementById('tabProfile').classList.remove('hidden');
                 document.getElementById('navProfile').className = "flex flex-col items-center text-blue-500 cursor-pointer";
+            } else if (tabName === 'admin') {
+                document.getElementById('tabAdmin').classList.remove('hidden');
+                document.getElementById('navAdmin').className = "flex flex-col items-center text-rose-500 cursor-pointer";
+                renderAdminPanel();
             }
+        }
+
+        // --- ADMIN PANELNI RENDERING QILISH ---
+        function renderAdminPanel() {
+            let users = JSON.parse(localStorage.getItem('weundy_users') || '[]');
+            document.getElementById('totalUsersBadge').innerText = `Jami: ${users.length} ta`;
+
+            const container = document.getElementById('adminUsersList');
+            if (users.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">Hozircha ro'yxatdan o'tgan foydalanuvchilar yo'q.</p>`;
+                return;
+            }
+
+            let html = '';
+            users.forEach((u, index) => {
+                html += `
+                    <div class="bg-slate-900 border border-slate-700/60 rounded-xl p-3 space-y-1.5 text-xs">
+                        <div class="flex justify-between items-center text-slate-400">
+                            <span class="font-bold text-white">#${index + 1} - ${u.name || 'Ismsiz'}</span>
+                            <span class="text-[10px] text-slate-500"><i class="fa-regular fa-clock mr-1"></i> ${u.lastLogin || 'Nomaʼlum'}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+                            <div><span class="text-slate-500">Login/Email:</span> <b class="text-blue-400">${u.email}</b></div>
+                            <div><span class="text-slate-500">Parol:</span> <b class="text-amber-400">${u.pass}</b></div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
         }
 
         function getTodayKey() {
@@ -491,7 +561,6 @@
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
-        // --- HAR BIR FOYDALANUCHI UCHUN ALOHIDA SUV BALANSI ---
         function addWater() {
             let email = getCurrentUserEmail();
             let today = getTodayKey();
@@ -578,7 +647,6 @@
             }
         }
 
-        // --- HAR BIR FOYDALANUVCHINING ALOHIDA TARIXI ---
         function saveMealToHistory() {
             let email = getCurrentUserEmail();
             const now = new Date();
@@ -749,7 +817,6 @@
             }
         }
 
-        // --- HAR BIR FOYDALANUVCHINING ALOHIDA PROFILI VA NORMASI ---
         function saveProfile() {
             let email = getCurrentUserEmail();
             const gender = document.getElementById('pGender').value;
