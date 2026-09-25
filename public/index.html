@@ -193,7 +193,11 @@
             <h2 id="tProfTitle" class="text-base font-bold text-white flex items-center"><i class="fa-solid fa-user mr-2 text-blue-500"></i> Shaxsiy parametrlar va maqsad</h2>
             <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3 text-sm">
                 <div>
-                    <label id="lblGender" class="xs text-slate-400">Jinsingiz:</label>
+                    <label id="lblUserEmailInfo" class="text-xs text-blue-400 block mb-1">Faol foydalanuvchi:</label>
+                    <p id="profileEmailDisplay" class="text-sm font-bold text-white bg-slate-900 px-3 py-2 rounded-xl border border-slate-700"></p>
+                </div>
+                <div>
+                    <label id="lblGender" class="text-xs text-slate-400">Jinsingiz:</label>
                     <select id="pGender" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 text-white">
                         <option value="male" id="optMale">Erkak</option>
                         <option value="female" id="optFemale">Ayol</option>
@@ -310,9 +314,6 @@
             applyTheme();
             document.getElementById('langSelect').value = currentLang;
             applyTranslations();
-            loadProfileData();
-            updateTodaySummary();
-            updateWaterDisplay();
         };
 
         function toggleTheme() {
@@ -339,6 +340,7 @@
                 document.getElementById('authModal').classList.remove('hidden');
             } else {
                 document.getElementById('authModal').classList.add('hidden');
+                loadUserDataForCurrentAccount();
             }
         }
 
@@ -352,20 +354,72 @@
             document.getElementById('nameFieldContainer').classList.toggle('hidden', !isSignUp);
         }
 
+        // --- REAL AVTORIZATSIYA VA TEKSHIRUV MANTIQI ---
         function handleAuthSubmit() {
-            const email = document.getElementById('authEmail').value;
-            const pass = document.getElementById('authPassword').value;
+            const email = document.getElementById('authEmail').value.trim();
+            const pass = document.getElementById('authPassword').value.trim();
+            const name = document.getElementById('authName').value.trim();
+
             if (!email || !pass) {
-                alert("Iltimos, maydonlarni to'ldiring!");
+                alert("Iltimos, email va parolni to'ldiring!");
                 return;
             }
-            localStorage.setItem('weundy_current_user', email);
-            document.getElementById('authModal').classList.add('hidden');
+
+            let users = JSON.parse(localStorage.getItem('weundy_users') || '[]');
+
+            if (isSignUp) {
+                // Ro'yxatdan o'tish rejimi
+                if (!name) {
+                    alert("Iltimos, ismingizni kiriting!");
+                    return;
+                }
+                let existingUser = users.find(u => u.email === email);
+                if (existingUser) {
+                    alert("Bu email allaqachon ro'yxatdan o'tgan! Tizimga kiring.");
+                    return;
+                }
+
+                // Yangi foydalanuvchi yaratish
+                let newUser = { name, email, pass };
+                users.push(newUser);
+                localStorage.setItem('weundy_users', JSON.stringify(users));
+                localStorage.setItem('weundy_current_user', email);
+                
+                document.getElementById('authModal').classList.add('hidden');
+                loadUserDataForCurrentAccount();
+            } else {
+                // Tizimga kirish rejimi
+                let user = users.find(u => u.email === email);
+                if (!user) {
+                    alert("Bunday hisob topilmadi. Iltimos, oldin ro'yxatdan o'ting!");
+                    return;
+                }
+                if (user.pass !== pass) {
+                    alert("Parol noto'g'ri! Qaytadan urinib ko'ring.");
+                    return;
+                }
+
+                localStorage.setItem('weundy_current_user', email);
+                document.getElementById('authModal').classList.add('hidden');
+                loadUserDataForCurrentAccount();
+            }
         }
 
         function logout() {
             localStorage.removeItem('weundy_current_user');
             checkAuth();
+        }
+
+        function getCurrentUserEmail() {
+            return localStorage.getItem('weundy_current_user') || 'default_user';
+        }
+
+        function loadUserDataForCurrentAccount() {
+            const email = getCurrentUserEmail();
+            document.getElementById('profileEmailDisplay').innerText = email;
+            loadProfileData();
+            updateTodaySummary();
+            updateWaterDisplay();
         }
 
         function changeLanguage(lang) {
@@ -432,34 +486,42 @@
             }
         }
 
-        // --- YANGILANGAN SUV MANTIQI (SANAGA BOG'LANGAN) ---
         function getTodayKey() {
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
+        // --- HAR BIR FOYDALANUCHI UCHUN ALOHIDA SUV BALANSI ---
         function addWater() {
+            let email = getCurrentUserEmail();
             let today = getTodayKey();
-            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
-            let currentWater = waterData[today] || 0;
+            let allWaterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            if (!allWaterData[email]) allWaterData[email] = {};
+            
+            let currentWater = allWaterData[email][today] || 0;
             if (currentWater < 8) currentWater++;
-            waterData[today] = currentWater;
-            localStorage.setItem('weundy_water_records', JSON.stringify(waterData));
+            allWaterData[email][today] = currentWater;
+            
+            localStorage.setItem('weundy_water_records', JSON.stringify(allWaterData));
             updateWaterDisplay();
         }
 
         function resetWater() {
+            let email = getCurrentUserEmail();
             let today = getTodayKey();
-            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
-            waterData[today] = 0;
-            localStorage.setItem('weundy_water_records', JSON.stringify(waterData));
+            let allWaterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            if (!allWaterData[email]) allWaterData[email] = {};
+            
+            allWaterData[email][today] = 0;
+            localStorage.setItem('weundy_water_records', JSON.stringify(allWaterData));
             updateWaterDisplay();
         }
 
         function updateWaterDisplay() {
+            let email = getCurrentUserEmail();
             let today = getTodayKey();
-            let waterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
-            let water = waterData[today] || 0;
+            let allWaterData = JSON.parse(localStorage.getItem('weundy_water_records') || '{}');
+            let water = (allWaterData[email] && allWaterData[email][today]) ? allWaterData[email][today] : 0;
             document.getElementById('waterCountDisplay').innerText = water + " / 8 stakan";
         }
 
@@ -516,13 +578,14 @@
             }
         }
 
-        // --- TAOMNI SAQLASH (ANIQ SANA BILAN) ---
+        // --- HAR BIR FOYDALANUVCHINING ALOHIDA TARIXI ---
         function saveMealToHistory() {
+            let email = getCurrentUserEmail();
             const now = new Date();
             const mealData = {
                 id: Date.now(),
-                rawDate: now.toISOString().split('T')[0], // YYYY-MM-DD format (kunlik hisob uchun)
-                date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), // Chiqarish uchun
+                rawDate: now.toISOString().split('T')[0],
+                date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 items: document.getElementById('foodItemsInput').value,
                 calories: document.getElementById('calorieInput').value,
                 protein: document.getElementById('proteinInput').value,
@@ -530,9 +593,11 @@
                 fats: document.getElementById('fatsInput').value
             };
 
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
-            history.unshift(mealData);
-            localStorage.setItem('weundy_history', JSON.stringify(history));
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            if (!allHistory[email]) allHistory[email] = [];
+            
+            allHistory[email].unshift(mealData);
+            localStorage.setItem('weundy_all_history', JSON.stringify(allHistory));
 
             resetApp();
             updateTodaySummary();
@@ -540,6 +605,7 @@
         }
 
         function saveAsFavorite() {
+            let email = getCurrentUserEmail();
             const favData = {
                 id: Date.now(),
                 items: document.getElementById('foodItemsInput').value,
@@ -549,15 +615,20 @@
                 fats: document.getElementById('fatsInput').value
             };
 
-            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
-            favorites.unshift(favData);
-            localStorage.setItem('weundy_favorites', JSON.stringify(favorites));
+            let allFavorites = JSON.parse(localStorage.getItem('weundy_all_favorites') || '{}');
+            if (!allFavorites[email]) allFavorites[email] = [];
+
+            allFavorites[email].unshift(favData);
+            localStorage.setItem('weundy_all_favorites', JSON.stringify(allFavorites));
             alert("Sevimli taomlarga qo'shildi!");
         }
 
         function renderFavorites() {
+            let email = getCurrentUserEmail();
             const list = document.getElementById('favoritesList');
-            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
+            let allFavorites = JSON.parse(localStorage.getItem('weundy_all_favorites') || '{}');
+            let favorites = allFavorites[email] || [];
+
             if (favorites.length === 0) {
                 list.innerHTML = `<p class="text-xs text-slate-400 text-center py-6 bg-slate-800 rounded-2xl">Hozircha sevimli taomlar yo'q.</p>`;
                 return;
@@ -578,7 +649,9 @@
         }
 
         function addFavToHistory(id) {
-            let favorites = JSON.parse(localStorage.getItem('weundy_favorites') || '[]');
+            let email = getCurrentUserEmail();
+            let allFavorites = JSON.parse(localStorage.getItem('weundy_all_favorites') || '{}');
+            let favorites = allFavorites[email] || [];
             let item = favorites.find(i => i.id === id);
             if (!item) return;
 
@@ -594,17 +667,22 @@
                 fats: item.fats
             };
 
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
-            history.unshift(mealData);
-            localStorage.setItem('weundy_history', JSON.stringify(history));
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            if (!allHistory[email]) allHistory[email] = [];
+            allHistory[email].unshift(mealData);
+            localStorage.setItem('weundy_all_history', JSON.stringify(allHistory));
+
             updateTodaySummary();
             switchTab('history');
         }
 
         function renderHistory() {
+            let email = getCurrentUserEmail();
             const historyList = document.getElementById('historyList');
             const searchVal = document.getElementById('historySearchInput').value.toLowerCase();
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            let history = allHistory[email] || [];
 
             if (searchVal) {
                 history = history.filter(i => i.items.toLowerCase().includes(searchVal));
@@ -642,15 +720,20 @@
         }
 
         function deleteHistoryItem(id) {
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
-            history = history.filter(item => item.id !== id);
-            localStorage.setItem('weundy_history', JSON.stringify(history));
+            let email = getCurrentUserEmail();
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            if (allHistory[email]) {
+                allHistory[email] = allHistory[email].filter(item => item.id !== id);
+                localStorage.setItem('weundy_all_history', JSON.stringify(allHistory));
+            }
             renderHistory();
             updateTodaySummary();
         }
 
         function editHistoryItem(id) {
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            let email = getCurrentUserEmail();
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            let history = allHistory[email] || [];
             let item = history.find(i => i.id === id);
             if (!item) return;
 
@@ -660,13 +743,15 @@
             if (newItems !== null && newCal !== null) {
                 item.items = newItems;
                 item.calories = newCal;
-                localStorage.setItem('weundy_history', JSON.stringify(history));
+                localStorage.setItem('weundy_all_history', JSON.stringify(allHistory));
                 renderHistory();
                 updateTodaySummary();
             }
         }
 
+        // --- HAR BIR FOYDALANUVCHINING ALOHIDA PROFILI VA NORMASI ---
         function saveProfile() {
+            let email = getCurrentUserEmail();
             const gender = document.getElementById('pGender').value;
             const age = parseInt(document.getElementById('pAge').value);
             const height = parseInt(document.getElementById('pHeight').value);
@@ -682,8 +767,9 @@
 
             norm = Math.round(norm);
 
-            localStorage.setItem('weundy_norm', norm);
-            localStorage.setItem('weundy_profile', JSON.stringify({gender, age, height, weight, goal}));
+            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
+            allProfiles[email] = { gender, age, height, weight, goal, norm };
+            localStorage.setItem('weundy_all_profiles', JSON.stringify(allProfiles));
 
             document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
             alert("Muvaffaqiyatli saqlandi!");
@@ -691,27 +777,37 @@
         }
 
         function loadProfileData() {
-            const profile = JSON.parse(localStorage.getItem('weundy_profile') || '{}');
-            if (profile.weight) {
+            let email = getCurrentUserEmail();
+            let allProfiles = JSON.parse(localStorage.getItem('weundy_all_profiles') || '{}');
+            let profile = allProfiles[email];
+
+            if (profile) {
                 document.getElementById('pGender').value = profile.gender;
                 document.getElementById('pAge').value = profile.age;
                 document.getElementById('pHeight').value = profile.height;
                 document.getElementById('pWeight').value = profile.weight;
                 document.getElementById('pGoal').value = profile.goal;
+                document.getElementById('dailyNormDisplay').innerText = profile.norm + " kcal";
+            } else {
+                document.getElementById('pGender').value = "male";
+                document.getElementById('pAge').value = 20;
+                document.getElementById('pHeight').value = 175;
+                document.getElementById('pWeight').value = 70;
+                document.getElementById('pGoal').value = "maintain";
+                document.getElementById('dailyNormDisplay').innerText = "2000 kcal";
             }
-            const norm = localStorage.getItem('weundy_norm') || '2000';
-            document.getElementById('dailyNormDisplay').innerText = norm + " kcal";
         }
 
-        // --- FAQAT BUGUNGI KUN KONSUMATSIYASINI HISOBLASH ---
         function updateTodaySummary() {
-            let history = JSON.parse(localStorage.getItem('weundy_history') || '[]');
+            let email = getCurrentUserEmail();
+            let allHistory = JSON.parse(localStorage.getItem('weundy_all_history') || '{}');
+            let history = allHistory[email] || [];
+            
             let totalCalories = 0;
             let totalProt = 0, totalCarbs = 0, totalFats = 0;
-            const todayKey = getTodayKey(); // Masalan: "2026-09-25"
+            const todayKey = getTodayKey();
 
             history.forEach(item => {
-                // Eski yozuvlarda rawDate bo'lmasa date stringidan tekshiradi, yangilarida esa aniq rawDate solishtiriladi
                 let isToday = item.rawDate ? (item.rawDate === todayKey) : item.date.startsWith(new Date().toLocaleDateString());
 
                 if (isToday) {
